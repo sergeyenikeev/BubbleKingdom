@@ -1,5 +1,6 @@
 export * from "./board";
 export * from "./economy/economy";
+export * from "./economy/offerDecisioning";
 export * from "./features/featureFlags";
 export * from "./localization/messages";
 export * from "./progression/dailyRewards";

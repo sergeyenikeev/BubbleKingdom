@@ -1,6 +1,12 @@
 import { chapters, questDefinitions } from "@bubble-kingdom/game-data";
 import type { GameSession, GameSessionState, ScreenId } from "@bubble-kingdom/game-core";
-import { calculateExtraMovesGemCost, totalStars, translate } from "@bubble-kingdom/game-core";
+import {
+  calculateExtraMovesGemCost,
+  decideFailOffer,
+  getPiggyBankPresentation,
+  totalStars,
+  translate,
+} from "@bubble-kingdom/game-core";
 
 export function mountApp(root: HTMLElement, session: GameSession, debugEnabled: boolean) {
   root.innerHTML = `
@@ -193,6 +199,8 @@ function renderMainLayout(
   chapter: (typeof chapters)[number],
   t: (key: string) => string,
 ) {
+  const piggyBank = getPiggyBankPresentation(state.save, state.remoteConfig, state.shopOffers);
+  const shouldShowPiggyPanel = piggyBank && piggyBank.storedGold > 0;
   return `
     <div class="main-layout">
       <div class="hero-stack">
@@ -225,6 +233,7 @@ function renderMainLayout(
         </section>
       </div>
       <div class="side-stack">
+        ${shouldShowPiggyPanel ? renderPiggyBankPanel(piggyBank, t) : ""}
         <section class="panel">
           <div class="panel-actions">
             <span class="tag">${t("screen.restore")}</span>
@@ -317,14 +326,28 @@ function renderOverlay(
   if (state.currentScreen === "win" || state.currentScreen === "fail") {
     const win = state.currentScreen === "win";
     const board = state.activeLevel?.board;
-    const gemContinueCost =
+    if (win) {
+      return `<div class="overlay-modal"><div class="panel modal-card"><div class="panel-actions"><span class="tag">${t("level.win")}</span><span class="tag">${t("ui.score")} ${board?.score ?? 0}</span></div><h2>${t("level.winFlavor")}</h2><div class="cta-row"><button class="primary-btn" data-action="acknowledge-level">${t("map.continue")}</button>${state.activeLevel?.winBonusClaimed ? `<button class="ghost-btn" disabled>${t("reward.doubleClaimed")}</button>` : `<button class="secondary-btn" data-action="claim-win-bonus">${t("reward.doubleClaim")}</button>`}<button class="ghost-btn" data-action="acknowledge-level">${t("screen.map")}</button></div></div></div>`;
+    }
+
+    const failDecision =
       state.activeLevel
+        ? decideFailOffer({
+            save: state.save,
+            remoteConfig: state.remoteConfig,
+            shopOffers: state.shopOffers,
+            continueOffersUsed: state.activeLevel.continueOffersUsed,
+          })
+        : null;
+    const gemContinueCost =
+      failDecision?.gemCost ??
+      (state.activeLevel
         ? calculateExtraMovesGemCost(
             state.activeLevel.continueOffersUsed,
             state.remoteConfig,
           )
-        : 0;
-    return `<div class="overlay-modal"><div class="panel modal-card"><div class="panel-actions"><span class="tag">${win ? t("level.win") : t("level.fail")}</span><span class="tag">${t("ui.score")} ${board?.score ?? 0}</span></div><h2>${win ? t("level.winFlavor") : t("level.failFlavor")}</h2><div class="cta-row">${win ? `<button class="primary-btn" data-action="acknowledge-level">${t("map.continue")}</button>${state.activeLevel?.winBonusClaimed ? `<button class="ghost-btn" disabled>${t("reward.doubleClaimed")}</button>` : `<button class="secondary-btn" data-action="claim-win-bonus">${t("reward.doubleClaim")}</button>`}` : `<button class="primary-btn" data-action="continue-rewarded">${t("reward.watchAdContinue")}</button><button class="secondary-btn" data-action="continue-gems">${t("level.continueWithGems")} ${gemContinueCost} ${t("currency.gems")}</button><button class="ghost-btn" data-action="restart-level">${t("level.retry")}</button>`}<button class="ghost-btn" data-action="acknowledge-level">${t("screen.map")}</button></div></div></div>`;
+        : 0);
+    return `<div class="overlay-modal"><div class="panel modal-card fail-modal"><div class="panel-actions"><span class="tag">${t("level.fail")}</span><span class="tag">${t("ui.score")} ${board?.score ?? 0}</span>${failDecision ? `<span class="tag tag-accent">${t("ui.recommended")}</span>` : ""}</div><h2>${failDecision ? t(failDecision.headlineKey) : t("level.failFlavor")}</h2><p class="small fail-copy">${failDecision ? t(failDecision.bodyKey) : t("level.failFlavor")}</p><div class="cta-row cta-row-stacked"><button class="${resolveFailButtonClass(failDecision?.primaryAction, "rewarded_continue")}" data-action="continue-rewarded">${t("reward.watchAdContinue")}</button><button class="${resolveFailButtonClass(failDecision?.primaryAction, "gems_continue")}" data-action="continue-gems" ${failDecision && !failDecision.hasEnoughGems ? "disabled" : ""}>${t("level.continueWithGems")} ${gemContinueCost} ${t("currency.gems")}</button></div>${failDecision?.piggyBank?.isNudged ? renderPiggyBankUpsellCard(state, failDecision, t) : ""}<div class="cta-row"><button class="ghost-btn" data-action="restart-level">${t("level.retry")}</button><button class="ghost-btn" data-action="acknowledge-level">${t("screen.map")}</button></div></div></div>`;
   }
 
   return `<div class="overlay-modal"><div class="panel modal-card">${renderModalContent(
@@ -344,7 +367,9 @@ function renderModalContent(
   }
 
   if (state.currentScreen === "shop") {
-    return `<div class="panel-actions"><span class="tag">${t("screen.shop")}</span><button class="ghost-btn" data-action="open-screen" data-id="map">${t("screen.map")}</button></div><div class="offer-grid">${state.shopOffers.map((offer) => `<div class="offer-card"><div class="panel-actions"><strong>${t(offer.titleKey)}</strong>${offer.badgeKey ? `<span class="tag">${t(offer.badgeKey)}</span>` : ""}</div><div class="small">${t(offer.descriptionKey)}</div><div class="small">${renderOfferRewards(offer, t)}</div>${offer.helperText ? `<div class="small">${t("shop.piggy.progress")} ${offer.helperText}</div>` : ""}<div class="small">${offer.platformPriceLabel}</div><button class="primary-btn" data-action="purchase-offer" data-id="${offer.id}">${t("shop.buy")}</button></div>`).join("")}</div>`;
+    const piggyBank = getPiggyBankPresentation(state.save, state.remoteConfig, state.shopOffers);
+    const offers = orderShopOffersForDisplay(state, piggyBank);
+    return `<div class="panel-actions"><span class="tag">${t("screen.shop")}</span><button class="ghost-btn" data-action="open-screen" data-id="map">${t("screen.map")}</button></div><div class="offer-grid">${offers.map((offer) => renderShopOfferCard(offer, piggyBank, t)).join("")}</div>`;
   }
 
   if (state.currentScreen === "quests") {
@@ -402,6 +427,77 @@ function renderOfferRewards(
     entries.push(`${amount} ${t(`booster.${boosterId}`)}`);
   }
   return entries.join(" | ");
+}
+
+function renderPiggyBankPanel(
+  piggyBank: NonNullable<ReturnType<typeof getPiggyBankPresentation>>,
+  t: (key: string) => string,
+) {
+  const statusCopy = piggyBank.isSpotlighted
+    ? t("shop.piggy.readyNow")
+    : piggyBank.isNudged
+      ? t("shop.piggy.nearlyReady")
+      : t("shop.piggy.building");
+  if (statusCopy !== "") {
+    return `<section class="panel piggy-panel ${piggyBank.isSpotlighted ? "is-spotlight" : ""}"><div class="panel-actions"><span class="tag">${t("shop.piggy.title")}</span>${piggyBank.isSpotlighted ? `<span class="tag tag-accent">${t("ui.recommended")}</span>` : ""}</div><strong>${statusCopy}</strong><div class="small">${t("shop.piggy.progress")} ${piggyBank.storedGold}/${piggyBank.cap} &middot; ${piggyBank.fillPercent}%</div><div class="progress-track"><div class="progress-fill" style="width: ${piggyBank.fillPercent}%"></div></div><div class="small">${t("shop.piggy.bonusPreview")} ${piggyBank.bonusGems} ${t("currency.gems")}</div><div class="cta-row"><button class="${piggyBank.isSpotlighted ? "primary-btn" : "secondary-btn"}" data-action="${piggyBank.isSpotlighted ? "purchase-offer" : "open-screen"}" data-id="${piggyBank.isSpotlighted ? piggyBank.offerId : "shop"}">${piggyBank.isSpotlighted ? t("shop.piggy.breakOpen") : t("shop.piggy.visitShop")}</button></div></section>`;
+  }
+  return `<section class="panel piggy-panel ${piggyBank.isSpotlighted ? "is-spotlight" : ""}"><div class="panel-actions"><span class="tag">${t("shop.piggy.title")}</span>${piggyBank.isSpotlighted ? `<span class="tag tag-accent">${t("ui.recommended")}</span>` : ""}</div><strong>${piggyBank.isSpotlighted ? t("shop.piggy.readyNow") : t("shop.piggy.building")}</strong><div class="small">${t("shop.piggy.progress")} ${piggyBank.storedGold}/${piggyBank.cap} · ${piggyBank.fillPercent}%</div><div class="progress-track"><div class="progress-fill" style="width: ${piggyBank.fillPercent}%"></div></div><div class="small">${t("shop.piggy.bonusPreview")} ${piggyBank.bonusGems} ${t("currency.gems")}</div><div class="cta-row"><button class="${piggyBank.isSpotlighted ? "primary-btn" : "secondary-btn"}" data-action="${piggyBank.isSpotlighted ? "purchase-offer" : "open-screen"}" data-id="${piggyBank.isSpotlighted ? piggyBank.offerId : "shop"}">${piggyBank.isSpotlighted ? t("shop.piggy.breakOpen") : t("shop.piggy.visitShop")}</button></div></section>`;
+}
+
+function renderPiggyBankUpsellCard(
+  state: GameSessionState,
+  decision: NonNullable<ReturnType<typeof decideFailOffer>>,
+  t: (key: string) => string,
+) {
+  const piggyBank = decision.piggyBank;
+  if (!piggyBank) {
+    return "";
+  }
+
+  const piggyOffer = state.shopOffers.find((offer) => offer.id === piggyBank.offerId);
+  if (piggyOffer?.id || piggyOffer === undefined) {
+    return `<div class="offer-card fail-offer-card ${decision.primaryAction === "piggy_bank" ? "is-highlighted" : ""}"><div class="panel-actions"><strong>${t("shop.piggy.title")}</strong>${decision.primaryAction === "piggy_bank" ? `<span class="tag tag-accent">${t("ui.recommended")}</span>` : piggyOffer?.badgeKey ? `<span class="tag">${t(piggyOffer.badgeKey)}</span>` : ""}</div><div class="small">${piggyBank.isSpotlighted ? t("shop.piggy.readyNow") : t("shop.piggy.nearlyReady")}</div><div class="progress-track"><div class="progress-fill" style="width: ${piggyBank.fillPercent}%"></div></div><div class="small">${t("shop.piggy.progress")} ${piggyBank.storedGold}/${piggyBank.cap} &middot; ${piggyBank.fillPercent}%</div><div class="small">${t("shop.piggy.bonusPreview")} ${piggyBank.bonusGems} ${t("currency.gems")}</div><div class="panel-actions"><span class="small">${piggyOffer?.platformPriceLabel ?? ""}</span><button class="${decision.primaryAction === "piggy_bank" ? "primary-btn" : "secondary-btn"}" data-action="purchase-offer" data-id="${piggyBank.offerId}">${t("shop.piggy.breakOpen")}</button></div></div>`;
+  }
+  return `<div class="offer-card fail-offer-card ${decision.primaryAction === "piggy_bank" ? "is-highlighted" : ""}"><div class="panel-actions"><strong>${t("shop.piggy.title")}</strong>${decision.primaryAction === "piggy_bank" ? `<span class="tag tag-accent">${t("ui.recommended")}</span>` : piggyOffer?.badgeKey ? `<span class="tag">${t(piggyOffer.badgeKey)}</span>` : ""}</div><div class="small">${piggyBank.isSpotlighted ? t("shop.piggy.readyNow") : t("shop.piggy.nearlyReady")}</div><div class="progress-track"><div class="progress-fill" style="width: ${piggyBank.fillPercent}%"></div></div><div class="small">${t("shop.piggy.progress")} ${piggyBank.storedGold}/${piggyBank.cap} · ${piggyBank.fillPercent}%</div><div class="small">${t("shop.piggy.bonusPreview")} ${piggyBank.bonusGems} ${t("currency.gems")}</div><div class="panel-actions"><span class="small">${piggyOffer?.platformPriceLabel ?? ""}</span><button class="${decision.primaryAction === "piggy_bank" ? "primary-btn" : "secondary-btn"}" data-action="purchase-offer" data-id="${piggyBank.offerId}">${t("shop.piggy.breakOpen")}</button></div></div>`;
+}
+
+function orderShopOffersForDisplay(
+  state: GameSessionState,
+  piggyBank: ReturnType<typeof getPiggyBankPresentation>,
+) {
+  const offers = [...state.shopOffers];
+  if (!piggyBank?.isNudged) {
+    return offers;
+  }
+
+  return offers.sort((left, right) => {
+    if (left.id === piggyBank.offerId) {
+      return -1;
+    }
+    if (right.id === piggyBank.offerId) {
+      return 1;
+    }
+    return 0;
+  });
+}
+
+function renderShopOfferCard(
+  offer: GameSessionState["shopOffers"][number],
+  piggyBank: ReturnType<typeof getPiggyBankPresentation>,
+  t: (key: string) => string,
+) {
+  const isPiggy = piggyBank?.offerId === offer.id;
+  if (isPiggy || offer.helperText) {
+    return `<div class="offer-card ${isPiggy && piggyBank?.isSpotlighted ? "is-highlighted" : ""}">${isPiggy && piggyBank ? `<div class="progress-ribbon">${piggyBank.fillPercent}%</div>` : ""}<div class="panel-actions"><strong>${t(offer.titleKey)}</strong>${offer.badgeKey ? `<span class="tag ${isPiggy && piggyBank?.isSpotlighted ? "tag-accent" : ""}">${t(offer.badgeKey)}</span>` : ""}</div><div class="small">${t(offer.descriptionKey)}</div><div class="small">${renderOfferRewards(offer, t)}</div>${isPiggy && piggyBank ? `<div class="small">${t("shop.piggy.progress")} ${piggyBank.storedGold}/${piggyBank.cap} &middot; ${piggyBank.fillPercent}%</div><div class="progress-track"><div class="progress-fill" style="width: ${piggyBank.fillPercent}%"></div></div><div class="small">${t("shop.piggy.bonusPreview")} ${piggyBank.bonusGems} ${t("currency.gems")}</div>` : offer.helperText ? `<div class="small">${offer.helperText}</div>` : ""}<div class="small">${offer.platformPriceLabel}</div><button class="${isPiggy && piggyBank?.isSpotlighted ? "primary-btn" : "secondary-btn"}" data-action="purchase-offer" data-id="${offer.id}">${isPiggy ? t("shop.piggy.breakOpen") : t("shop.buy")}</button></div>`;
+  }
+  return `<div class="offer-card ${isPiggy && piggyBank.isSpotlighted ? "is-highlighted" : ""}">${isPiggy ? `<div class="progress-ribbon">${piggyBank.fillPercent}%</div>` : ""}<div class="panel-actions"><strong>${t(offer.titleKey)}</strong>${offer.badgeKey ? `<span class="tag ${isPiggy && piggyBank?.isSpotlighted ? "tag-accent" : ""}">${t(offer.badgeKey)}</span>` : ""}</div><div class="small">${t(offer.descriptionKey)}</div><div class="small">${renderOfferRewards(offer, t)}</div>${isPiggy && piggyBank ? `<div class="small">${t("shop.piggy.progress")} ${piggyBank.storedGold}/${piggyBank.cap} · ${piggyBank.fillPercent}%</div><div class="progress-track"><div class="progress-fill" style="width: ${piggyBank.fillPercent}%"></div></div><div class="small">${t("shop.piggy.bonusPreview")} ${piggyBank.bonusGems} ${t("currency.gems")}</div>` : offer.helperText ? `<div class="small">${t("shop.piggy.progress")} ${offer.helperText}</div>` : ""}<div class="small">${offer.platformPriceLabel}</div><button class="${isPiggy && piggyBank?.isSpotlighted ? "primary-btn" : "secondary-btn"}" data-action="purchase-offer" data-id="${offer.id}">${isPiggy ? t("shop.piggy.breakOpen") : t("shop.buy")}</button></div>`;
+}
+
+function resolveFailButtonClass(
+  primaryAction: ReturnType<typeof decideFailOffer>["primaryAction"] | undefined,
+  action: ReturnType<typeof decideFailOffer>["primaryAction"],
+) {
+  return primaryAction === action ? "primary-btn" : "secondary-btn";
 }
 
 function isGameplayScreen(screen: ScreenId) {

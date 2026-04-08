@@ -97,6 +97,13 @@ Rewarded entry points must always:
 - Gem extra-moves second.
 - Booster reminder third.
 
+The fail surface is now explicitly data-driven:
+
+- `fail_offer_variant` can bias the primary CTA toward rewarded, gem spend, or piggy bank recovery.
+- `economy.failOfferGemPrimaryLevel` delays gem-first prompting until mid-game tension is established.
+- `economy.piggyBankNudgeRatio` and `economy.piggyBankSpotlightRatio` control when the piggy bank becomes a contextual upsell instead of generic shop inventory.
+- The fail modal always keeps the rewarded path visible, so monetization stays additive rather than mandatory.
+
 ### First chapter progression
 
 - Restoration costs become visible.
@@ -137,10 +144,21 @@ Key monetization knobs already modeled in config:
 - `economy.generousLivesEnabled`
 - `economy.starterPackGemBonus`
 - `economy.piggyBankCap`
+- `economy.piggyBankNudgeRatio`
+- `economy.piggyBankSpotlightRatio`
 - `economy.extraMovesGemCost`
+- `economy.failOfferGemPrimaryLevel`
 - `leaderboards.weeklyStarsId`
 - `commerce.receiptValidationMode`
 - `commerce.productIdOverrides`
+
+Experiment hooks already wired for monetization tuning:
+
+- `interstitial_pacing`
+- `starter_pack_price`
+- `daily_reward`
+- `lives_mode`
+- `fail_offer_variant`
 
 ## Commerce Contract
 

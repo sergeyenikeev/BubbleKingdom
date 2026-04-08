@@ -154,6 +154,8 @@ Each event should carry the shared session envelope where available:
 - `moves_used`
 - `objective_progress`
 - `continue_offer_available`
+- `recommendedAction`
+- `failOfferVariant`
 
 ### `rewarded_reward_granted`
 
@@ -169,6 +171,16 @@ Each event should carry the shared session envelope where available:
 - `gross_price_label`
 - `currency_code`
 - `first_purchase`
+
+### `extra_moves_offer_shown`
+
+- `level_id`
+- `recommendedAction`
+- `gemCost`
+- `hasEnoughGems`
+- `failOfferVariant`
+- `piggyBankShown`
+- `piggyBankFillRatio`
 
 ## Backend Contract
 
@@ -189,6 +201,7 @@ Recommended dimensions:
 - `tutorial_variant`
 - `daily_reward_variant`
 - `difficulty_curve_variant`
+- `fail_offer_variant`
 
 ## Reporting Cadence
 

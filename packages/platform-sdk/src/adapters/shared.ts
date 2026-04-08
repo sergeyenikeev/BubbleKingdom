@@ -129,8 +129,17 @@ export function parseRemoteFlags(flags: Record<string, string> | undefined): Par
       starterPackGemBonus:
         number("economy_starter_pack_bonus") ?? defaultRemoteConfig.economy.starterPackGemBonus,
       piggyBankCap: number("economy_piggy_bank_cap") ?? defaultRemoteConfig.economy.piggyBankCap,
+      piggyBankNudgeRatio:
+        number("economy_piggy_bank_nudge_ratio") ??
+        defaultRemoteConfig.economy.piggyBankNudgeRatio,
+      piggyBankSpotlightRatio:
+        number("economy_piggy_bank_spotlight_ratio") ??
+        defaultRemoteConfig.economy.piggyBankSpotlightRatio,
       extraMovesGemCost:
         number("economy_extra_moves_cost") ?? defaultRemoteConfig.economy.extraMovesGemCost,
+      failOfferGemPrimaryLevel:
+        number("economy_fail_offer_gem_primary_level") ??
+        defaultRemoteConfig.economy.failOfferGemPrimaryLevel,
     },
     tutorial: {
       enabled: bool("tutorial_enabled") ?? defaultRemoteConfig.tutorial.enabled,

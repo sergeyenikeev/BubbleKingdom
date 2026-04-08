@@ -23,6 +23,7 @@ Current unit suites cover:
 - board generation and resolution basics
 - content validation and curated early-level progression
 - score and economy helpers
+- fail-offer decisioning and piggy bank presentation thresholds
 - save schema / migration / service round-trips
 - feature flag assignment
 - mock platform purchase behavior
@@ -44,6 +45,7 @@ Current integration suite validates:
 - daily reward claim
 - level completion and reward grant
 - fail + rewarded continue
+- fail + gem continue
 - shop open + purchase
 - localization switch
 - leaderboard submission

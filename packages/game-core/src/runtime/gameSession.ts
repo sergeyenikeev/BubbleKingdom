@@ -39,6 +39,7 @@ import {
   calculatePiggyBankProgress,
   spendCurrency,
 } from "../economy/economy";
+import { decideFailOffer } from "../economy/offerDecisioning";
 import { assignExperimentVariants } from "../features/featureFlags";
 import { translate } from "../localization/messages";
 import { claimDailyReward, getDailyRewardAvailability } from "../progression/dailyRewards";
@@ -560,6 +561,12 @@ export function createGameSession(input: {
         await maybeShowInterstitial("level_complete");
         await persist();
       } else if (summary.failAchieved) {
+        const failOfferDecision = decideFailOffer({
+          save: state.save,
+          remoteConfig: state.remoteConfig,
+          shopOffers: state.shopOffers,
+          continueOffersUsed: levelSession.continueOffersUsed,
+        });
         updateState({
           currentScreen: "fail",
         });
@@ -567,9 +574,17 @@ export function createGameSession(input: {
         await input.platform.analytics.track("level_fail", {
           levelId: levelSession.level.id,
           score: levelSession.board.score,
+          recommendedAction: failOfferDecision.primaryAction,
+          failOfferVariant: failOfferDecision.variant,
         });
         await input.platform.analytics.track("extra_moves_offer_shown", {
           levelId: levelSession.level.id,
+          recommendedAction: failOfferDecision.primaryAction,
+          gemCost: failOfferDecision.gemCost,
+          hasEnoughGems: failOfferDecision.hasEnoughGems,
+          failOfferVariant: failOfferDecision.variant,
+          piggyBankShown: Boolean(failOfferDecision.piggyBank?.isNudged),
+          piggyBankFillRatio: failOfferDecision.piggyBank?.fillRatio ?? 0,
         });
       } else {
         emitter.emit("state", state);

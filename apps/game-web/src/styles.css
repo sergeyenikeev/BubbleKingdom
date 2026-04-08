@@ -133,6 +133,7 @@ select {
 .restoration-card,
 .quest-card,
 .offer-card,
+.piggy-panel,
 .list-card,
 .notice,
 .level-node,
@@ -198,6 +199,11 @@ select {
   gap: 10px;
 }
 
+.cta-row-stacked {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .primary-btn,
 .secondary-btn,
 .ghost-btn,
@@ -221,6 +227,13 @@ select {
 .icon-btn:active,
 .nav-btn:active {
   transform: translateY(1px) scale(0.99);
+}
+
+.primary-btn:disabled,
+.secondary-btn:disabled,
+.ghost-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 .primary-btn {
@@ -269,6 +282,12 @@ select {
   padding: 10px;
 }
 
+.tag-accent {
+  background: rgba(255, 141, 59, 0.22);
+  color: #8a3d11;
+  font-weight: 700;
+}
+
 .nav-btn.is-active {
   background: rgba(76, 191, 176, 0.24);
   font-weight: 700;
@@ -287,6 +306,15 @@ select {
 .modal-card {
   width: min(680px, 100%);
   max-height: calc(100dvh - 48px);
+}
+
+.fail-modal {
+  display: grid;
+  gap: 14px;
+}
+
+.fail-copy {
+  margin: -6px 0 0;
 }
 
 .level-hud {
@@ -318,6 +346,49 @@ select {
   white-space: pre-wrap;
 }
 
+.progress-track {
+  width: 100%;
+  height: 12px;
+  border-radius: 999px;
+  background: rgba(23, 48, 66, 0.12);
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent-2), var(--accent));
+}
+
+.offer-card,
+.piggy-panel {
+  position: relative;
+  overflow: hidden;
+}
+
+.offer-card.is-highlighted,
+.piggy-panel.is-spotlight {
+  border-color: rgba(255, 141, 59, 0.35);
+  box-shadow: 0 20px 48px rgba(255, 141, 59, 0.18);
+}
+
+.progress-ribbon {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(255, 141, 59, 0.18);
+  color: #8a3d11;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.fail-offer-card {
+  display: grid;
+  gap: 10px;
+}
+
 @media (max-width: 960px) {
   .top-bar,
   .main-layout {
@@ -331,6 +402,10 @@ select {
 
   .bottom-nav {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .cta-row-stacked {
+    grid-template-columns: 1fr;
   }
 
   .level-hud {

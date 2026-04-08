@@ -25,7 +25,10 @@ export interface RemoteConfig {
     };
     starterPackGemBonus: number;
     piggyBankCap: number;
+    piggyBankNudgeRatio: number;
+    piggyBankSpotlightRatio: number;
     extraMovesGemCost: number;
+    failOfferGemPrimaryLevel: number;
   };
   tutorial: {
     enabled: boolean;
@@ -64,7 +67,10 @@ export const defaultRemoteConfig: RemoteConfig = {
     },
     starterPackGemBonus: 75,
     piggyBankCap: 300,
+    piggyBankNudgeRatio: 0.45,
+    piggyBankSpotlightRatio: 0.85,
     extraMovesGemCost: 12,
+    failOfferGemPrimaryLevel: 18,
   },
   tutorial: {
     enabled: true,
@@ -111,6 +117,11 @@ export const defaultRemoteConfig: RemoteConfig = {
       key: "daily_reward_curve",
       variants: ["rich", "standard"],
       defaultVariant: "rich",
+    },
+    {
+      key: "fail_offer_variant",
+      variants: ["rewarded_primary", "gems_primary", "piggy_primary"],
+      defaultVariant: "rewarded_primary",
     },
   ],
 };
