@@ -18,3 +18,4 @@ The project follows Semantic Versioning and Conventional Commits.
 - Replaced the first 30 procedural levels with a hand-authored onboarding and retention curve, while keeping a validated procedural tail through level 100.
 - Added strict content validation for palettes, tokens, objective targets, chapter sequencing, and a dedicated `pnpm validate:content` CI gate.
 - Added data-driven fail-offer decisioning, piggy-bank spotlight thresholds, and clearer piggy-bank CTAs across the fail flow, map shell, and shop.
+- Hardened Yandex commerce for production by preferring `/sdk.js` in Yandex builds, wiring signed receipts into server validation, and rejecting silent fallback grants when `receiptValidationMode=server`.

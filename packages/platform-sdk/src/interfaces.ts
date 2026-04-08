@@ -23,6 +23,7 @@ export interface PlatformProduct {
 export interface PurchaseReceipt {
   productId: string;
   purchaseToken?: string;
+  signature?: string;
   developerPayload?: string;
 }
 

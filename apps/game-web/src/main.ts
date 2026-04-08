@@ -22,6 +22,7 @@ async function main() {
 
   const buildTarget = resolveBuildTarget(__BUILD_TARGET__);
   const backendUrl = import.meta.env.VITE_BACKEND_URL;
+  const yandexSdkUrl = normalizeOptionalEnv(import.meta.env.VITE_YANDEX_SDK_URL);
   const debugEnabled =
     buildTarget === "local" ||
     new URLSearchParams(window.location.search).get("debug") === "1";
@@ -50,6 +51,7 @@ async function main() {
     platformTarget:
       buildTarget === "yandex" ? "yandex" : buildTarget === "vk" ? "vk" : "web-mock",
     backendUrl,
+    yandexSdkUrl,
     debug: debugEnabled,
     analyticsSinks,
     logger,
@@ -105,6 +107,9 @@ function createAdapterOptions(
   if (input.backendUrl) {
     options.backendUrl = input.backendUrl;
   }
+  if (input.yandexSdkUrl) {
+    options.yandexSdkUrl = input.yandexSdkUrl;
+  }
   return options;
 }
 
@@ -113,6 +118,10 @@ function resolveBuildTarget(value: string): "local" | "yandex" | "vk" | "test" {
     return value;
   }
   return "local";
+}
+
+function normalizeOptionalEnv(value: unknown): string | undefined {
+  return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
 function preventBrowserGestures() {

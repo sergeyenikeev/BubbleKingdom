@@ -859,6 +859,7 @@ export function createGameSession(input: {
         offerId: string;
         productId: string;
         purchaseToken?: string;
+        signature?: string;
         developerPayload?: string;
         anonymousId: string;
         userId?: string;
@@ -871,6 +872,9 @@ export function createGameSession(input: {
       };
       if (receipt.purchaseToken) {
         validationPayloadInput.purchaseToken = receipt.purchaseToken;
+      }
+      if (receipt.signature) {
+        validationPayloadInput.signature = receipt.signature;
       }
       if (receipt.developerPayload) {
         validationPayloadInput.developerPayload = receipt.developerPayload;
@@ -1121,6 +1125,7 @@ function createReceiptValidationPayload(input: {
   offerId: string;
   productId: string;
   purchaseToken?: string;
+  signature?: string;
   developerPayload?: string;
   anonymousId: string;
   userId?: string;
@@ -1135,6 +1140,9 @@ function createReceiptValidationPayload(input: {
 
   if (input.purchaseToken) {
     payload.purchaseToken = input.purchaseToken;
+  }
+  if (input.signature) {
+    payload.signature = input.signature;
   }
   if (input.developerPayload) {
     payload.developerPayload = input.developerPayload;

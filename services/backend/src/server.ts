@@ -153,6 +153,7 @@ server.post("/receipts/validate", async (request) => {
     offerId: string;
     productId: string;
     purchaseToken?: string;
+    signature?: string;
     developerPayload?: string;
     anonymousId: string;
     userId?: string;
@@ -199,6 +200,26 @@ server.post("/receipts/validate", async (request) => {
       source: "backend",
       reason: "product_id_mismatch",
     };
+  }
+
+  if (config.commerce.receiptValidationMode === "server" && body.platformTarget === "yandex") {
+    if (!body.purchaseToken || !body.signature) {
+      logger.warn("IAP", "Signed Yandex receipt rejected", {
+        offerId: body.offerId,
+        productId: body.productId,
+        hasPurchaseToken: Boolean(body.purchaseToken),
+        hasSignature: Boolean(body.signature),
+      });
+
+      return {
+        ok: false,
+        status: "rejected",
+        shouldGrant: false,
+        consumePurchase: false,
+        source: "backend",
+        reason: "missing_signed_receipt",
+      };
+    }
   }
 
   return {

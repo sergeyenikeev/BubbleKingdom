@@ -24,6 +24,7 @@ export interface AdapterRuntimeOptions {
   platformTarget: PlatformTarget;
   appVersion?: string | undefined;
   backendUrl?: string | undefined;
+  yandexSdkUrl?: string | undefined;
   storagePrefix?: string | undefined;
   debug?: boolean | undefined;
   analyticsSinks?: AnalyticsSink[] | undefined;

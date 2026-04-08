@@ -27,6 +27,7 @@ Current unit suites cover:
 - save schema / migration / service round-trips
 - feature flag assignment
 - mock platform purchase behavior
+- Yandex SDK URL and signed-receipt helper logic
 
 Primary files:
 

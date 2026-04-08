@@ -28,6 +28,8 @@ These tasks cannot be fully automated from the repository and must be completed 
 5. Enable leaderboards if used in production.
 6. If production leaderboard IDs differ from defaults, override `leaderboards.weeklyStarsId`.
 7. Switch `commerce.receiptValidationMode` from `stub` to `server` only after server-side validation rules are ready.
+8. When `commerce.receiptValidationMode=server`, verify the Yandex purchase flow returns signed receipts in sandbox and the backend is reachable from the deployed build.
+9. Keep `VITE_YANDEX_SDK_URL` empty for production Yandex uploads so the game uses the platform-native `/sdk.js` path by default. Use the override only for controlled off-platform debugging.
 
 ### Promo assets
 
@@ -56,6 +58,7 @@ These tasks cannot be fully automated from the repository and must be completed 
 3. Add retention/logging policy for event ingestion.
 4. Wire `VITE_BACKEND_URL` in the client build pipeline.
 5. Verify `GET /commerce` and `POST /receipts/validate` before enabling real-money validation.
+6. Confirm `POST /receipts/validate` rejects unsigned Yandex receipts when `receiptValidationMode=server`.
 
 ## Analytics / BI
 

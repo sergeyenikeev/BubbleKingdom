@@ -171,8 +171,14 @@ The backend now exposes a commerce-facing contract that can be switched on witho
 Default behavior is intentionally safe for MVP:
 
 - local/mock builds use stub receipt acceptance,
-- Yandex builds can fall back to platform-only granting if the backend is unavailable,
+- Yandex builds can fall back to platform-only granting if the backend is unavailable and `receiptValidationMode` is not `server`,
 - server mode can be enabled later through remote config once real console IDs and validation rules are ready.
+
+Current Yandex commerce hardening:
+
+- Yandex production builds prefer `/sdk.js`, matching the platform-hosted SDK path.
+- When `commerce.receiptValidationMode=server`, the adapter switches purchases to signed mode and forwards the receipt signature to backend validation.
+- If signed receipt data or backend validation is unavailable in `server` mode, the client now refuses to auto-grant the purchase instead of silently falling back to platform grant logic.
 
 ## Rating Protection Rules
 

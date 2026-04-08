@@ -176,6 +176,7 @@ export interface ReceiptValidationRequest {
   offerId: string;
   productId: string;
   purchaseToken?: string;
+  signature?: string;
   developerPayload?: string;
   anonymousId: string;
   userId?: string;
