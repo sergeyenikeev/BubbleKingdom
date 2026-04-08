@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { defaultRemoteConfig } from "../../../config/src/index";
 import { createBoardState, createGameSession } from "../../src/index";
 import { createMockPlatformAdapter } from "../../../platform-sdk/src/index";
 import { createLogger } from "../../../shared/src/index";
@@ -178,6 +179,45 @@ describe("game session integration", () => {
     expect(session.getState().leaderboard.length).toBeGreaterThan(0);
   });
 
+  it("respects remote-configured leaderboard ids", async () => {
+    const logger = createLogger({
+      sessionId: "test",
+      anonymousId: "test-anon",
+      appVersion: "0.1.0-alpha",
+      buildTarget: "test",
+      platformTarget: "web-mock",
+    });
+    const platform = createMockPlatformAdapter({
+      buildTarget: "test",
+      platformTarget: "web-mock",
+      debug: true,
+      logger,
+      analyticsSinks: [],
+      storagePrefix: "bubble-kingdom-test",
+    });
+    const boardIds: string[] = [];
+    platform.remoteConfig.getRemoteConfig = async () => ({
+      ...defaultRemoteConfig,
+      leaderboards: {
+        weeklyStarsId: "stars_elite",
+      },
+    });
+    platform.leaderboards.submitScore = async (boardId, score) => {
+      boardIds.push(boardId);
+      return score > 0;
+    };
+    platform.leaderboards.getEntries = async (boardId) => {
+      boardIds.push(boardId);
+      return [];
+    };
+
+    const session = createSession({ platform, logger });
+    await session.boot();
+    await session.submitLeaderboard();
+
+    expect(boardIds).toContain("stars_elite");
+  });
+
   it("grants a rewarded double-win bonus and refreshes monetization state", async () => {
     const session = createSession();
     await session.boot();
@@ -211,6 +251,41 @@ describe("game session integration", () => {
 
     await session.purchaseOffer("no_ads");
     expect(session.getState().shopOffers.some((offer) => offer.id === "no_ads")).toBe(false);
+  });
+
+  it("does not grant a purchase when receipt validation rejects it", async () => {
+    const logger = createLogger({
+      sessionId: "test",
+      anonymousId: "test-anon",
+      appVersion: "0.1.0-alpha",
+      buildTarget: "test",
+      platformTarget: "web-mock",
+    });
+    const platform = createMockPlatformAdapter({
+      buildTarget: "test",
+      platformTarget: "web-mock",
+      debug: true,
+      logger,
+      analyticsSinks: [],
+      storagePrefix: "bubble-kingdom-test",
+    });
+    platform.purchases.validateReceipt = async () => ({
+      ok: false,
+      status: "rejected",
+      shouldGrant: false,
+      consumePurchase: false,
+      source: "backend",
+      reason: "product_id_mismatch",
+    });
+
+    const session = createSession({ platform, logger });
+    await session.boot();
+    const beforeGems = session.getState().save.currencies.gems;
+
+    await session.purchaseOffer("starter_pack");
+
+    expect(session.getState().save.currencies.gems).toBe(beforeGems);
+    expect(session.getState().save.economy.firstPurchaseAt).toBeNull();
   });
 
   it("recovers from corrupted saves", async () => {

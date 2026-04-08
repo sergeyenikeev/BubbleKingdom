@@ -170,6 +170,19 @@ export function createMockPlatformAdapter(options: AdapterRuntimeOptions): Platf
           pendingPurchases.splice(index, 1);
         }
       },
+      async validateReceipt(input) {
+        runtime.logger.info("IAP", "Mock receipt validation accepted", {
+          offerId: input.offerId,
+          productId: input.productId,
+        });
+        return {
+          ok: true,
+          status: "accepted_stub",
+          shouldGrant: true,
+          consumePurchase: true,
+          source: "stub",
+        };
+      },
     },
     storage,
     cloudSave: {

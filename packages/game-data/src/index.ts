@@ -11,6 +11,7 @@ export * from "./content/quests";
 export * from "./content/validation";
 export * from "./levels/generated";
 export * from "./shop/catalog";
+export * from "./shop/commerce";
 
 export const contentVersion = "2026.04.08-mvp";
 

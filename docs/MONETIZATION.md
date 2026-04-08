@@ -138,6 +138,23 @@ Key monetization knobs already modeled in config:
 - `economy.starterPackGemBonus`
 - `economy.piggyBankCap`
 - `economy.extraMovesGemCost`
+- `leaderboards.weeklyStarsId`
+- `commerce.receiptValidationMode`
+- `commerce.productIdOverrides`
+
+## Commerce Contract
+
+The backend now exposes a commerce-facing contract that can be switched on without rewriting the game client:
+
+- `GET /config` for live remote config, including leaderboard IDs and receipt-validation mode
+- `GET /commerce` for resolved offer-to-product bindings per platform
+- `POST /receipts/validate` for receipt-validation stubs and future server-side validation
+
+Default behavior is intentionally safe for MVP:
+
+- local/mock builds use stub receipt acceptance,
+- Yandex builds can fall back to platform-only granting if the backend is unavailable,
+- server mode can be enabled later through remote config once real console IDs and validation rules are ready.
 
 ## Rating Protection Rules
 

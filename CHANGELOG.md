@@ -13,3 +13,5 @@ The project follows Semantic Versioning and Conventional Commits.
 - Hardened monetization flows with currency delta analytics, safer continue-state guards, and mock storage isolation for reliable cross-session tests.
 - Split the web build into lightweight shell, gameplay, platform, and lazy Phaser engine chunks to reduce initial boot cost.
 - Expanded the mock purchase catalog so local monetization flows better mirror live shop pricing and offer coverage.
+- Added a commerce contract for product-ID overrides, receipt-validation stubs, and remote-configured leaderboard IDs across the client, SDK adapters, and backend.
+- Hardened purchase validation and Vitest workspace resolution so monetization flows remain stable even when package `dist` builds are stale in local test runs.

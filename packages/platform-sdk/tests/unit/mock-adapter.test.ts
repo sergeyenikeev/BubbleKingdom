@@ -32,6 +32,26 @@ describe("mock platform adapter", () => {
     expect(receipt?.purchaseToken).toContain("purchase_");
   });
 
+  it("accepts receipts through the mock validator", async () => {
+    const adapter = createMockPlatformAdapter({
+      buildTarget: "test",
+      platformTarget: "web-mock",
+      analyticsSinks: [],
+    });
+
+    const result = await adapter.purchases.validateReceipt?.({
+      offerId: "starter_pack",
+      productId: "starter_pack",
+      purchaseToken: "purchase_test",
+      anonymousId: "anon_test",
+      platformTarget: "web-mock",
+    });
+
+    expect(result?.ok).toBe(true);
+    expect(result?.shouldGrant).toBe(true);
+    expect(result?.consumePurchase).toBe(true);
+  });
+
   it("returns the full mock shop catalog for local monetization flows", async () => {
     const adapter = createMockPlatformAdapter({
       buildTarget: "test",

@@ -36,6 +36,13 @@ export interface RemoteConfig {
     comebackRewardGems: number;
     weeklyLeaderboardEnabled: boolean;
   };
+  leaderboards: {
+    weeklyStarsId: string;
+  };
+  commerce: {
+    receiptValidationMode: "stub" | "server" | "platform_only";
+    productIdOverrides: Record<"web-mock" | "yandex" | "vk", Record<string, string>>;
+  };
   experiments: FeatureFlagDefinition[];
 }
 
@@ -67,6 +74,17 @@ export const defaultRemoteConfig: RemoteConfig = {
     currentEventId: "spring_blossom",
     comebackRewardGems: 25,
     weeklyLeaderboardEnabled: true,
+  },
+  leaderboards: {
+    weeklyStarsId: "weekly_stars",
+  },
+  commerce: {
+    receiptValidationMode: "stub",
+    productIdOverrides: {
+      "web-mock": {},
+      yandex: {},
+      vk: {},
+    },
   },
   experiments: [
     {

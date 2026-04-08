@@ -11,6 +11,7 @@ import type {
   LeaderboardEntry,
   LevelDefinition,
   RewardGrant,
+  ReceiptValidationRequest,
   ShopOfferDefinition,
 } from "@bubble-kingdom/shared";
 import {
@@ -20,6 +21,7 @@ import {
 import type { RemoteConfig } from "@bubble-kingdom/config";
 import {
   defaultRemoteConfig,
+  mergeRemoteConfig,
   resolveBuildProfile,
   type BuildProfile,
 } from "@bubble-kingdom/config";
@@ -330,7 +332,10 @@ export function createGameSession(input: {
       await input.platform.analytics.track("shop_open");
     }
     if (screen === "leaderboards") {
-      const leaderboard = await input.platform.leaderboards.getEntries("weekly_stars");
+      const leaderboardId = resolveWeeklyLeaderboardId(state.remoteConfig);
+      const leaderboard = await input.platform.leaderboards.getEntries(
+        leaderboardId,
+      );
       updateState({ leaderboard });
       await input.platform.analytics.track("leaderboard_open");
     }
@@ -386,7 +391,10 @@ export function createGameSession(input: {
       }
 
       const locale = await input.platform.locale.getLanguage();
-      const remoteConfig = await input.platform.remoteConfig.getRemoteConfig();
+      const remoteConfig = mergeRemoteConfig(
+        defaultRemoteConfig,
+        await input.platform.remoteConfig.getRemoteConfig(),
+      );
       const loadedSave = await loadPlayerSave({
         platform: input.platform,
         remoteConfig,
@@ -806,13 +814,18 @@ export function createGameSession(input: {
       if (!offer) {
         throw new Error(`Unknown offer ${offerId}`);
       }
+      const platformProductId = resolvePlatformProductId(
+        offer,
+        input.platform.target,
+        state.remoteConfig,
+      );
       await input.platform.analytics.track("iap_offer_view", { offerId });
       await input.platform.analytics.track("iap_start", { offerId });
 
       let receipt: Awaited<ReturnType<PlatformAdapter["purchases"]["purchase"]>>;
       try {
         receipt = await input.platform.purchases.purchase(
-          offer.yandexProductId ?? offer.sku,
+          platformProductId,
           JSON.stringify({ offerId }),
         );
       } catch (error) {
@@ -827,13 +840,73 @@ export function createGameSession(input: {
         return;
       }
 
+      const validationPayloadInput: {
+        offerId: string;
+        productId: string;
+        purchaseToken?: string;
+        developerPayload?: string;
+        anonymousId: string;
+        userId?: string;
+        platformTarget: PlatformAdapter["target"];
+      } = {
+        offerId,
+        productId: receipt.productId,
+        anonymousId: state.save.profile.anonymousId,
+        platformTarget: input.platform.target,
+      };
+      if (receipt.purchaseToken) {
+        validationPayloadInput.purchaseToken = receipt.purchaseToken;
+      }
+      if (receipt.developerPayload) {
+        validationPayloadInput.developerPayload = receipt.developerPayload;
+      }
+      if (state.save.profile.userId) {
+        validationPayloadInput.userId = state.save.profile.userId;
+      }
+      const validationRequest = createReceiptValidationPayload(validationPayloadInput);
+      const validation =
+        (await input.platform.purchases.validateReceipt?.(validationRequest)) ?? {
+          ok: true,
+          status: "skipped",
+          shouldGrant: true,
+          consumePurchase: true,
+          source: "platform",
+        };
+
+      if (!validation.ok || !validation.shouldGrant) {
+        await input.platform.analytics.track("iap_failed", {
+          offerId,
+          productId: receipt.productId,
+          validationStatus: validation.status,
+          reason: validation.reason ?? "receipt_rejected",
+        });
+        addNotification(translate(state.locale, "shop.purchasePending"));
+        return;
+      }
+
+      if (
+        validation.consumePurchase &&
+        receipt.purchaseToken &&
+        input.platform.purchases.consumePurchase
+      ) {
+        await input.platform.purchases.consumePurchase(receipt.purchaseToken).catch((error) => {
+          input.logger.warn("IAP", "Purchase consume failed", {
+            offerId,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        });
+      }
+
       const beforeSave = state.save;
       const updated = applyShopOffer(state.save, offer);
       updateState({
         save: updated,
       });
       refreshShopOffers(updated);
-      await input.platform.analytics.track("iap_success", { offerId });
+      await input.platform.analytics.track("iap_success", {
+        offerId,
+        validationStatus: validation.status,
+      });
       await trackCurrencyDelta(beforeSave, updated, "shop_purchase", { offerId });
       addNotification(`${translate(state.locale, offer.titleKey)} ${translate(state.locale, "shop.acquired")}`);
       await persist();
@@ -922,8 +995,9 @@ export function createGameSession(input: {
     },
     async submitLeaderboard() {
       const score = totalStars(state.save);
+      const leaderboardId = resolveWeeklyLeaderboardId(state.remoteConfig);
       const success = await input.platform.leaderboards.submitScore(
-        "weekly_stars",
+        leaderboardId,
         score,
         JSON.stringify({
           chapter: state.save.progression.currentLevelId,
@@ -932,7 +1006,7 @@ export function createGameSession(input: {
       if (success) {
         await input.platform.analytics.track("leaderboard_submit", { score });
       }
-      const leaderboard = await input.platform.leaderboards.getEntries("weekly_stars");
+      const leaderboard = await input.platform.leaderboards.getEntries(leaderboardId);
       updateState({ leaderboard });
     },
     async setSetting(key, value) {
@@ -994,6 +1068,67 @@ function createWinBonusReward(baseReward: RewardGrant, multiplier: number): Rewa
     petals: Math.floor((baseReward.petals ?? 0) * bonusMultiplier),
     seasonalTokens: Math.floor((baseReward.seasonalTokens ?? 0) * bonusMultiplier),
   };
+}
+
+function resolveWeeklyLeaderboardId(remoteConfig: RemoteConfig): string {
+  return (
+    remoteConfig.leaderboards?.weeklyStarsId ??
+    defaultRemoteConfig.leaderboards?.weeklyStarsId ??
+    "weekly_stars"
+  );
+}
+
+function resolvePlatformProductId(
+  offer: ShopOfferDefinition,
+  platformTarget: PlatformAdapter["target"],
+  remoteConfig: RemoteConfig,
+): string {
+  const overrides =
+    remoteConfig.commerce?.productIdOverrides ??
+    defaultRemoteConfig.commerce?.productIdOverrides ?? {
+      "web-mock": {},
+      yandex: {},
+      vk: {},
+    };
+  const override = overrides[platformTarget][offer.id];
+  if (override) {
+    return override;
+  }
+
+  if (platformTarget === "yandex") {
+    return offer.yandexProductId ?? offer.sku;
+  }
+
+  return offer.sku;
+}
+
+function createReceiptValidationPayload(input: {
+  offerId: string;
+  productId: string;
+  purchaseToken?: string;
+  developerPayload?: string;
+  anonymousId: string;
+  userId?: string;
+  platformTarget: PlatformAdapter["target"];
+}): ReceiptValidationRequest {
+  const payload: ReceiptValidationRequest = {
+    offerId: input.offerId,
+    productId: input.productId,
+    anonymousId: input.anonymousId,
+    platformTarget: input.platformTarget,
+  };
+
+  if (input.purchaseToken) {
+    payload.purchaseToken = input.purchaseToken;
+  }
+  if (input.developerPayload) {
+    payload.developerPayload = input.developerPayload;
+  }
+  if (input.userId) {
+    payload.userId = input.userId;
+  }
+
+  return payload;
 }
 
 function rewardGrantFromInbox(item: GameSessionState["save"]["inbox"][number]): RewardGrant {

@@ -16,6 +16,11 @@ export default defineConfig({
     alias,
   },
   test: {
+    server: {
+      deps: {
+        inline: [/^@bubble-kingdom\//],
+      },
+    },
     projects: [
       {
         test: {

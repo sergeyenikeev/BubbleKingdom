@@ -6,6 +6,7 @@ import {
   fallbackLanguage,
   loadAnonymousId,
   resolveRemoteConfig,
+  validateReceiptWithBackend,
 } from "./shared";
 import type {
   AdOutcome,
@@ -277,6 +278,28 @@ export function createYandexPlatformAdapter(options: AdapterRuntimeOptions): Pla
         const sdk = await ensureSdk();
         const payments = await sdk.getPayments();
         await payments.consumePurchase(purchaseToken);
+      },
+      async validateReceipt(input) {
+        const validated = await validateReceiptWithBackend(runtime.backendUrl, input).catch(
+          (error) => {
+            runtime.logger.warn("IAP", "Yandex receipt validation fallback activated", {
+              error: error instanceof Error ? error.message : String(error),
+              offerId: input.offerId,
+            });
+            return null;
+          },
+        );
+        if (validated) {
+          return validated;
+        }
+
+        return {
+          ok: true,
+          status: "skipped",
+          shouldGrant: true,
+          consumePurchase: true,
+          source: "platform",
+        };
       },
     },
     storage: {

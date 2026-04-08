@@ -24,7 +24,10 @@ These tasks cannot be fully automated from the repository and must be completed 
 1. Enable monetization in the console.
 2. Create IAP products that match the in-game offer catalog.
 3. Bind console product IDs to the SKUs used in `packages/game-data/src/shop/catalog.ts`.
-4. Enable leaderboards if used in production.
+4. If console IDs differ from in-repo defaults, add overrides via backend `remoteConfigOverride` using dotted keys such as `commerce.productIdOverrides.yandex`.
+5. Enable leaderboards if used in production.
+6. If production leaderboard IDs differ from defaults, override `leaderboards.weeklyStarsId`.
+7. Switch `commerce.receiptValidationMode` from `stub` to `server` only after server-side validation rules are ready.
 
 ### Promo assets
 
@@ -52,6 +55,7 @@ These tasks cannot be fully automated from the repository and must be completed 
 2. Set production database path / connection string.
 3. Add retention/logging policy for event ingestion.
 4. Wire `VITE_BACKEND_URL` in the client build pipeline.
+5. Verify `GET /commerce` and `POST /receipts/validate` before enabling real-money validation.
 
 ## Analytics / BI
 

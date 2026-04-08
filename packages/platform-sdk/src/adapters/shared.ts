@@ -8,6 +8,8 @@ import {
   createLogger,
   createId,
   normalizeLanguage,
+  type ReceiptValidationRequest,
+  type ReceiptValidationResult,
   safeJsonParse,
   type LanguageCode,
   type Logger,
@@ -101,6 +103,15 @@ export function parseRemoteFlags(flags: Record<string, string> | undefined): Par
     return value === "true" || value === "yes" || value === "1";
   };
 
+  const receiptValidationMode = (
+    value: string | undefined,
+  ): RemoteConfig["commerce"]["receiptValidationMode"] | undefined => {
+    if (value === "stub" || value === "server" || value === "platform_only") {
+      return value;
+    }
+    return undefined;
+  };
+
   return {
     ads: {
       interstitialEvery: number("ads_interstitial_every") ?? defaultRemoteConfig.ads.interstitialEvery,
@@ -132,8 +143,40 @@ export function parseRemoteFlags(flags: Record<string, string> | undefined): Par
       weeklyLeaderboardEnabled:
         bool("liveops_weekly_lb_enabled") ?? defaultRemoteConfig.liveops.weeklyLeaderboardEnabled,
     },
+    leaderboards: {
+      weeklyStarsId:
+        flags.leaderboards_weekly_stars_id ?? defaultRemoteConfig.leaderboards.weeklyStarsId,
+    },
+    commerce: {
+      receiptValidationMode:
+        receiptValidationMode(flags.commerce_receipt_validation_mode) ??
+        defaultRemoteConfig.commerce.receiptValidationMode,
+      productIdOverrides: defaultRemoteConfig.commerce.productIdOverrides,
+    },
     experiments: defaultRemoteConfig.experiments,
   };
+}
+
+export async function validateReceiptWithBackend(
+  backendUrl: string | undefined,
+  payload: ReceiptValidationRequest,
+): Promise<ReceiptValidationResult | null> {
+  if (!backendUrl) {
+    return null;
+  }
+
+  const response = await fetch(`${backendUrl}/receipts/validate`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    throw new Error(`Receipt validation failed: ${response.status}`);
+  }
+
+  return (await response.json()) as ReceiptValidationResult;
 }
 
 export async function fetchRemoteConfigFromBackend(

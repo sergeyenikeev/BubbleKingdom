@@ -2,6 +2,8 @@ import type {
   LanguageCode,
   LeaderboardEntry,
   PlatformTarget,
+  ReceiptValidationRequest,
+  ReceiptValidationResult,
   SessionInfo,
 } from "@bubble-kingdom/shared";
 import type { AnalyticsEventName } from "@bubble-kingdom/analytics";
@@ -55,6 +57,7 @@ export interface IPlatformPurchases {
   purchase(productId: string, developerPayload?: string): Promise<PurchaseReceipt | null>;
   getPendingPurchases(): Promise<PurchaseReceipt[]>;
   consumePurchase?(purchaseToken: string): Promise<void>;
+  validateReceipt?(input: ReceiptValidationRequest): Promise<ReceiptValidationResult>;
 }
 
 export interface IPlatformStorage {

@@ -172,6 +172,25 @@ export interface ShopOfferDefinition {
   yandexProductId?: string;
 }
 
+export interface ReceiptValidationRequest {
+  offerId: string;
+  productId: string;
+  purchaseToken?: string;
+  developerPayload?: string;
+  anonymousId: string;
+  userId?: string;
+  platformTarget: PlatformTarget;
+}
+
+export interface ReceiptValidationResult {
+  ok: boolean;
+  status: "accepted_stub" | "validated" | "rejected" | "skipped";
+  shouldGrant: boolean;
+  consumePurchase: boolean;
+  source: "stub" | "backend" | "platform";
+  reason?: string;
+}
+
 export interface LeaderboardEntry {
   playerId: string;
   displayName: string;

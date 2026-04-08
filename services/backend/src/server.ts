@@ -3,8 +3,15 @@ import { PrismaClient } from "@prisma/client";
 import Fastify from "fastify";
 
 import { analyticsEventSchema } from "@bubble-kingdom/analytics";
-import { defaultRemoteConfig } from "@bubble-kingdom/config";
-import { contentVersion, liveContent, shopCatalog } from "@bubble-kingdom/game-data";
+import { defaultRemoteConfig, mergeRemoteConfig } from "@bubble-kingdom/config";
+import {
+  buildCommerceBindings,
+  contentVersion,
+  getShopOfferById,
+  liveContent,
+  resolvePlatformProductId,
+  shopCatalog,
+} from "@bubble-kingdom/game-data";
 import { createLogger, safeJsonParse } from "@bubble-kingdom/shared";
 
 const prisma = new PrismaClient();
@@ -39,14 +46,7 @@ server.get("/ready", async () => {
 });
 
 server.get("/config", async () => {
-  const overrides = await prisma.remoteConfigOverride.findMany().catch(() => []);
-  const patch = Object.fromEntries(
-    overrides.map((item) => [item.key, JSON.parse(item.valueJson)]),
-  );
-  return {
-    ...defaultRemoteConfig,
-    ...patch,
-  };
+  return loadRuntimeConfig();
 });
 
 server.post("/experiments/assign", async (request) => {
@@ -138,6 +138,79 @@ server.get("/shop", async () => {
   }));
 });
 
+server.get("/commerce", async () => {
+  const config = await loadRuntimeConfig();
+
+  return {
+    leaderboards: config.leaderboards,
+    receiptValidationMode: config.commerce.receiptValidationMode,
+    offers: buildCommerceBindings(config),
+  };
+});
+
+server.post("/receipts/validate", async (request) => {
+  const body = request.body as {
+    offerId: string;
+    productId: string;
+    purchaseToken?: string;
+    developerPayload?: string;
+    anonymousId: string;
+    userId?: string;
+    platformTarget: "web-mock" | "yandex" | "vk";
+  };
+  const config = await loadRuntimeConfig();
+  const offer = getShopOfferById(body.offerId);
+
+  if (!offer) {
+    return {
+      ok: false,
+      status: "rejected",
+      shouldGrant: false,
+      consumePurchase: false,
+      source: "backend",
+      reason: "unknown_offer",
+    };
+  }
+
+  if (config.commerce.receiptValidationMode === "platform_only") {
+    return {
+      ok: true,
+      status: "skipped",
+      shouldGrant: true,
+      consumePurchase: true,
+      source: "platform",
+    };
+  }
+
+  const expectedProductId = resolvePlatformProductId(offer, body.platformTarget, config);
+  if (body.productId !== expectedProductId) {
+    logger.warn("IAP", "Receipt validation rejected", {
+      offerId: body.offerId,
+      productId: body.productId,
+      expectedProductId,
+      platformTarget: body.platformTarget,
+    });
+
+    return {
+      ok: false,
+      status: "rejected",
+      shouldGrant: false,
+      consumePurchase: false,
+      source: "backend",
+      reason: "product_id_mismatch",
+    };
+  }
+
+  return {
+    ok: true,
+    status:
+      config.commerce.receiptValidationMode === "server" ? "validated" : "accepted_stub",
+    shouldGrant: true,
+    consumePurchase: true,
+    source: config.commerce.receiptValidationMode === "server" ? "backend" : "stub",
+  };
+});
+
 server.get("/content", async () => ({
   version: contentVersion,
   counts: {
@@ -150,6 +223,36 @@ server.get("/content", async () => ({
 
 const port = Number(process.env.PORT ?? 8787);
 const host = process.env.HOST ?? "0.0.0.0";
+
+async function loadRuntimeConfig() {
+  const overrides = await prisma.remoteConfigOverride.findMany().catch(() => []);
+  const patch: Record<string, unknown> = {};
+  for (const item of overrides) {
+    setNestedValue(patch, item.key, JSON.parse(item.valueJson));
+  }
+  return mergeRemoteConfig(
+    defaultRemoteConfig,
+    patch as Partial<typeof defaultRemoteConfig>,
+  );
+}
+
+function setNestedValue(target: Record<string, unknown>, dottedKey: string, value: unknown) {
+  const segments = dottedKey.split(".").filter(Boolean);
+  if (segments.length === 0) {
+    return;
+  }
+
+  let cursor: Record<string, unknown> = target;
+  for (const segment of segments.slice(0, -1)) {
+    const next = cursor[segment];
+    if (!next || typeof next !== "object" || Array.isArray(next)) {
+      cursor[segment] = {};
+    }
+    cursor = cursor[segment] as Record<string, unknown>;
+  }
+
+  cursor[segments.at(-1)!] = value;
+}
 
 async function start() {
   try {
