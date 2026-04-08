@@ -15,3 +15,5 @@ The project follows Semantic Versioning and Conventional Commits.
 - Expanded the mock purchase catalog so local monetization flows better mirror live shop pricing and offer coverage.
 - Added a commerce contract for product-ID overrides, receipt-validation stubs, and remote-configured leaderboard IDs across the client, SDK adapters, and backend.
 - Hardened purchase validation and Vitest workspace resolution so monetization flows remain stable even when package `dist` builds are stale in local test runs.
+- Replaced the first 30 procedural levels with a hand-authored onboarding and retention curve, while keeping a validated procedural tail through level 100.
+- Added strict content validation for palettes, tokens, objective targets, chapter sequencing, and a dedicated `pnpm validate:content` CI gate.

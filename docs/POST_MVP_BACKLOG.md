@@ -17,7 +17,7 @@ Sorted by expected business impact first, with effort called out for prioritizat
 
 | Item | Revenue impact | Retention impact | Effort |
 | --- | --- | --- | --- |
-| Hand-authored level curve for first 30 levels | Medium | High | Medium |
+| Expand hand-authored level curve from first 30 levels to full first 50 levels | Medium | High | Medium |
 | Comeback campaigns with inbox rewards | Medium | High | Medium |
 | Restoration animations and before/after reveal beats | Medium | High | Medium |
 | Chapter completion chest ceremony | Medium | High | Low |
@@ -29,7 +29,7 @@ Sorted by expected business impact first, with effort called out for prioritizat
 | Item | Revenue impact | Retention impact | Effort |
 | --- | --- | --- | --- |
 | Remote-config dashboard or admin panel | Medium | Medium | High |
-| Level validator and balancing tooling | Low | High | Medium |
+| Balancing telemetry and level-authoring tooling for post-30 content | Low | High | Medium |
 | Receipt validation service | High | Low | Medium |
 | Push-like re-engagement hooks where platform allows | Medium | Medium | Medium |
 | BI dashboard integration | Medium | Medium | Medium |

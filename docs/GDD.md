@@ -181,7 +181,8 @@ Rewarded is always optional and clearly labeled with the reward.
 
 ### MVP
 
-- 100 generated levels in the initial data pack.
+- 30 hand-authored early-game levels with controlled mechanic rollout.
+- Procedural tail extending the initial pack to 100 total levels.
 - 2 restoration chapters.
 - 5+ blocker/special types.
 - Basic shop.
@@ -191,7 +192,7 @@ Rewarded is always optional and clearly labeled with the reward.
 
 ### Post-MVP
 
-- Hand-authored level packs with difficulty curves by chapter.
+- Expand hand-authored level packs through the full first 50 levels and chapter-specific mechanic arcs.
 - Seasonal pass.
 - More blockers and chapter-specific mechanics.
 - Decoration collections and cosmetic branches.

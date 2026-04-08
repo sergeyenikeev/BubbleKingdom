@@ -9,11 +9,13 @@ export * from "./content/chapters";
 export * from "./content/dailyRewards";
 export * from "./content/quests";
 export * from "./content/validation";
+export * from "./levels/curated";
 export * from "./levels/generated";
+export * from "./levels/helpers";
 export * from "./shop/catalog";
 export * from "./shop/commerce";
 
-export const contentVersion = "2026.04.08-mvp";
+export const contentVersion = "2026.04.08-mvp.1";
 
 export const contentValidationErrors = [
   ...validateLevelData(levels),

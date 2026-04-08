@@ -43,6 +43,9 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+      - name: Validate content
+        run: pnpm validate:content
+
       - name: Unit tests
         run: pnpm test:unit
 

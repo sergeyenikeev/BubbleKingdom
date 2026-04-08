@@ -1,13 +1,7 @@
 import type { BubbleColor, LevelDefinition, ObjectiveType } from "@bubble-kingdom/shared";
 
-const colorTokens: Record<BubbleColor, string> = {
-  ruby: "R",
-  sapphire: "B",
-  emerald: "G",
-  sun: "Y",
-  amethyst: "P",
-  aqua: "C",
-};
+import { curatedLevels } from "./curated";
+import { createQueuePattern, tokenForColor } from "./helpers";
 
 const palettes: BubbleColor[][] = [
   ["ruby", "sapphire", "emerald", "sun"],
@@ -27,8 +21,8 @@ const objectives: ObjectiveType[] = [
   "grow_flowers",
 ];
 
-function tokenForColor(color: BubbleColor): string {
-  return colorTokens[color];
+function colorToken(palette: BubbleColor[], index: number, prefix = ""): string {
+  return `${prefix}${tokenForColor(palette[index % palette.length] ?? palette[0] ?? "ruby")}`;
 }
 
 function createBaseRows(palette: BubbleColor[], seed: number): string[] {
@@ -43,52 +37,57 @@ function createBaseRows(palette: BubbleColor[], seed: number): string[] {
   return rows;
 }
 
-function injectSpecials(rows: string[], objective: ObjectiveType, levelId: number): string[] {
+function injectSpecials(
+  rows: string[],
+  objective: ObjectiveType,
+  levelId: number,
+  palette: BubbleColor[],
+): string[] {
   const split = rows.map((row) => row.split(" "));
   const lane = levelId % 4;
 
-  if (levelId >= 5) {
+  if (levelId >= 32) {
     split[2]![lane + 1] = "S";
   }
-  if (levelId >= 8) {
-    split[3]![4 - lane] = "IR";
+  if (levelId >= 38) {
+    split[3]![4 - lane] = colorToken(palette, 0, "I");
   }
-  if (levelId >= 12) {
-    split[4]![lane + 2] = "VR";
+  if (levelId >= 44) {
+    split[4]![lane + 2] = colorToken(palette, 1, "V");
   }
-  if (levelId >= 18) {
-    split[5]![3] = "FC";
+  if (levelId >= 52) {
+    split[5]![3] = colorToken(palette, 2, "F");
   }
 
   switch (objective) {
     case "collect_crystals":
-      split[7]![2] = "CR";
-      split[7]![5] = "CB";
+      split[7]![2] = colorToken(palette, 0, "C");
+      split[7]![5] = colorToken(palette, 1, "C");
       break;
     case "free_sprites":
-      split[6]![3] = "PR";
-      split[6]![4] = "PG";
+      split[6]![3] = colorToken(palette, 0, "P");
+      split[6]![4] = colorToken(palette, 1, "P");
       break;
     case "break_blockers":
       split[2]![1] = "S";
       split[2]![6] = "S";
-      split[3]![2] = "IR";
-      split[3]![5] = "IB";
+      split[3]![2] = colorToken(palette, 0, "I");
+      split[3]![5] = colorToken(palette, 1, "I");
       break;
     case "clear_fog":
-      split[5]![2] = "FR";
-      split[5]![5] = "FG";
-      split[6]![3] = "FY";
+      split[5]![2] = colorToken(palette, 0, "F");
+      split[5]![5] = colorToken(palette, 1, "F");
+      split[6]![3] = colorToken(palette, 2, "F");
       break;
     case "drop_artifacts":
-      split[4]![3] = "AR";
+      split[4]![3] = colorToken(palette, 0, "A");
       split[5]![3] = ".";
       split[6]![3] = ".";
       split[7]![3] = ".";
       break;
     case "grow_flowers":
-      split[6]![2] = "HR";
-      split[6]![5] = "HG";
+      split[6]![2] = colorToken(palette, 0, "H");
+      split[6]![5] = colorToken(palette, 1, "H");
       break;
     default:
       break;
@@ -97,50 +96,57 @@ function injectSpecials(rows: string[], objective: ObjectiveType, levelId: numbe
   return split.map((row) => row.join(" "));
 }
 
-function createQueue(palette: BubbleColor[], levelId: number): LevelDefinition["queue"] {
-  return Array.from({ length: 24 }, (_, index) => {
-    if (index > 0 && index % 9 === 0 && levelId >= 10) {
-      return "bomb";
-    }
-    if (index > 0 && index % 11 === 0 && levelId >= 18) {
-      return "line";
-    }
-    if (index > 0 && index % 13 === 0 && levelId >= 22) {
-      return "rainbow";
-    }
-    return palette[(index + levelId) % palette.length]!;
-  });
-}
-
-export function generateLevels(): LevelDefinition[] {
-  return Array.from({ length: 100 }, (_, index) => {
-    const levelId = index + 1;
+export function generateProceduralLevels(startId = 31, count = 70): LevelDefinition[] {
+  return Array.from({ length: count }, (_, index) => {
+    const levelId = startId + index;
     const palette = palettes[index % palettes.length]!;
     const objective = objectives[index % objectives.length]!;
     const chapterId =
       levelId <= 50 ? "chapter_blossom_gardens" : "chapter_moonlit_courtyard";
-    const layout = injectSpecials(createBaseRows(palette, levelId), objective, levelId);
+    const layout = injectSpecials(createBaseRows(palette, levelId), objective, levelId, palette);
+    const objectiveTargetMap: Partial<Record<ObjectiveType, number>> = {
+      collect_crystals: 2,
+      free_sprites: 2,
+      break_blockers: 4,
+      clear_fog: 3,
+      drop_artifacts: 1,
+      grow_flowers: 2,
+    };
+    const queueOptions: Parameters<typeof createQueuePattern>[2] = {};
+    const specials: NonNullable<Parameters<typeof createQueuePattern>[2]>["specials"] = [];
+    if (levelId >= 40) {
+      specials.push({ index: 8, value: "bomb" });
+    }
+    if (levelId >= 56) {
+      specials.push({ index: 12, value: "line" });
+    }
+    if (levelId >= 72) {
+      specials.push({ index: 16, value: "rainbow" });
+    }
+    if (specials.length > 0) {
+      queueOptions.specials = specials;
+    }
 
     return {
       id: levelId,
       chapterId,
       indexInChapter: levelId <= 50 ? levelId : levelId - 50,
-      moves: Math.max(14, 24 - Math.floor(levelId / 8)),
+      moves: Math.max(12, 22 - Math.floor((levelId - startId) / 9)),
       palette,
       objective:
         objective === "clear_all"
           ? { type: objective }
-          : { type: objective, target: objective === "break_blockers" ? 4 : 2 + (levelId % 4) },
+          : { type: objective, target: objectiveTargetMap[objective] ?? 2 },
       layout,
-      queue: createQueue(palette, levelId),
+      queue: createQueuePattern(palette, levelId, queueOptions),
       rewards: {
-        gold: 50 + levelId * 6,
-        petals: 5 + Math.floor(levelId / 4),
-        seasonalTokens: levelId >= 20 ? 3 + Math.floor(levelId / 10) : 0,
+        gold: 55 + levelId * 6,
+        petals: 8 + Math.floor(levelId / 4),
+        seasonalTokens: levelId >= 45 ? 3 + Math.floor(levelId / 10) : 0,
       },
-      difficulty: levelId < 15 ? "easy" : levelId < 50 ? "medium" : "hard",
+      difficulty: levelId < 45 ? "medium" : "hard",
     };
   });
 }
 
-export const levels = generateLevels();
+export const levels = [...curatedLevels, ...generateProceduralLevels()];

@@ -13,6 +13,7 @@ Bubble Kingdom is a revenue-first HTML5 bubble shooter built for Yandex Games wi
 ## Current MVP Foundation
 
 - Playable vertical slice with map, one-tap level start, win/fail states, daily reward, quests, shop, restoration, leaderboards, inbox, and settings/pause overlay.
+- Hand-authored early-game level curve for levels `1-30`, followed by a procedural tail to `100` total levels.
 - Deterministic board, economy, save, and progression systems in `packages/game-core`.
 - Mock, Yandex, and VK-stub platform adapters.
 - Optional Fastify backend for remote config, experiments, liveops, and analytics ingestion.
@@ -26,6 +27,7 @@ Bubble Kingdom is a revenue-first HTML5 bubble shooter built for Yandex Games wi
 - `pnpm test:smoke`
 - `pnpm lint`
 - `pnpm typecheck`
+- `pnpm validate:content`
 - `pnpm build`
 - `pnpm build:yandex`
 - `pnpm build:vk`
@@ -39,9 +41,10 @@ Bubble Kingdom is a revenue-first HTML5 bubble shooter built for Yandex Games wi
 
 For a release-ready Yandex artifact:
 
-1. `corepack pnpm test`
-2. `corepack pnpm test:smoke`
-3. `corepack pnpm pack:yandex`
+1. `corepack pnpm validate:content`
+2. `corepack pnpm test`
+3. `corepack pnpm test:smoke`
+4. `corepack pnpm pack:yandex`
 
 ## Repository Layout
 

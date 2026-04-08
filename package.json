@@ -14,6 +14,7 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "typecheck": "corepack pnpm -r typecheck",
+    "validate:content": "corepack pnpm --filter @bubble-kingdom/game-data validate:content",
     "test": "corepack pnpm test:unit && corepack pnpm test:integration",
     "test:unit": "vitest run --project unit --coverage",
     "test:integration": "vitest run --project integration",

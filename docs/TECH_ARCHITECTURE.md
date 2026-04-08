@@ -12,7 +12,7 @@
 - `apps/game-web`: Phaser + DOM-shell web client.
 - `services/backend`: Fastify backend for config, experiments, liveops, and analytics ingestion.
 - `packages/game-core`: pure gameplay, economy, save, progression, runtime orchestration.
-- `packages/game-data`: levels, quests, chapters, daily rewards, shop catalog, content validation.
+- `packages/game-data`: hand-authored early levels, procedural level tail, quests, chapters, daily rewards, shop catalog, and content validation.
 - `packages/platform-sdk`: interfaces and platform adapters.
 - `packages/analytics`: event schemas and tracker.
 - `packages/shared`: IDs, logger, shared types, utility helpers.

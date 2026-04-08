@@ -13,6 +13,7 @@
 - `pnpm test:integration`
 - `pnpm test:smoke`
 - `pnpm typecheck`
+- `pnpm validate:content`
 - `pnpm build`
 
 ## Unit Test Coverage
@@ -20,6 +21,7 @@
 Current unit suites cover:
 
 - board generation and resolution basics
+- content validation and curated early-level progression
 - score and economy helpers
 - save schema / migration / service round-trips
 - feature flag assignment
@@ -28,6 +30,7 @@ Current unit suites cover:
 Primary files:
 
 - `packages/game-core/tests/unit/board.test.ts`
+- `packages/game-data/tests/unit/content-validation.test.ts`
 - `packages/game-core/tests/unit/economy.test.ts`
 - `packages/game-core/tests/unit/save-and-flags.test.ts`
 - `packages/game-core/tests/unit/save-service.test.ts`
@@ -71,11 +74,12 @@ The GitHub Actions workflow runs:
 2. Prisma client generation
 3. lint
 4. typecheck
-5. unit tests
-6. integration tests
-7. build
-8. smoke tests
-9. Yandex packaging
+5. content validation
+6. unit tests
+7. integration tests
+8. build
+9. smoke tests
+10. Yandex packaging
 
 ## Manual QA Checklist
 
