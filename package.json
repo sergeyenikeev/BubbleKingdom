@@ -1,0 +1,44 @@
+{
+  "name": "bubble-kingdom",
+  "private": true,
+  "version": "0.1.0-alpha",
+  "description": "Revenue-first hybrid bubble shooter for Yandex Games and other web platforms.",
+  "packageManager": "pnpm@10.6.5",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "dev": "corepack pnpm --parallel --filter @bubble-kingdom/backend --filter @bubble-kingdom/game-web dev",
+    "dev:game": "corepack pnpm --filter @bubble-kingdom/game-web dev",
+    "dev:backend": "corepack pnpm --filter @bubble-kingdom/backend dev",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "typecheck": "corepack pnpm -r typecheck",
+    "test": "corepack pnpm test:unit && corepack pnpm test:integration",
+    "test:unit": "vitest run --project unit --coverage",
+    "test:integration": "vitest run --project integration",
+    "test:smoke": "corepack pnpm --filter @bubble-kingdom/game-web build && playwright test",
+    "build": "corepack pnpm -r build",
+    "build:yandex": "corepack pnpm --filter @bubble-kingdom/game-web build:yandex",
+    "build:vk": "corepack pnpm --filter @bubble-kingdom/game-web build:vk",
+    "pack:yandex": "corepack pnpm --filter @bubble-kingdom/game-web pack:yandex",
+    "prisma:generate": "corepack pnpm --filter @bubble-kingdom/backend prisma:generate"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.23.0",
+    "@playwright/test": "^1.52.0",
+    "@types/node": "^22.14.0",
+    "@vitest/coverage-v8": "^3.1.1",
+    "eslint": "^9.23.0",
+    "globals": "^16.0.0",
+    "jsdom": "^26.0.0",
+    "playwright": "^1.52.0",
+    "prettier": "^3.5.3",
+    "tsup": "^8.4.0",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8.28.0",
+    "vitest": "^3.1.1",
+    "wait-on": "^8.0.3"
+  }
+}

@@ -1,0 +1,160 @@
+import { beforeEach, describe, expect, it } from "vitest";
+
+import { createBoardState, createGameSession } from "../../src/index";
+import { createMockPlatformAdapter } from "../../../platform-sdk/src/index";
+import { createLogger } from "../../../shared/src/index";
+import type { LevelDefinition } from "../../../shared/src/index";
+
+describe("game session integration", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
+  function createSession(existing?: {
+    platform: ReturnType<typeof createMockPlatformAdapter>;
+    logger: ReturnType<typeof createLogger>;
+  }) {
+    if (existing) {
+      return createGameSession({
+        platform: existing.platform,
+        logger: existing.logger,
+        buildTarget: "test",
+      });
+    }
+
+    const logger = createLogger({
+      sessionId: "test",
+      anonymousId: "test-anon",
+      appVersion: "0.1.0-alpha",
+      buildTarget: "test",
+      platformTarget: "web-mock",
+    });
+    const platform = createMockPlatformAdapter({
+      buildTarget: "test",
+      platformTarget: "web-mock",
+      debug: true,
+      logger,
+      analyticsSinks: [],
+      storagePrefix: "bubble-kingdom-test",
+    });
+    return createGameSession({
+      platform,
+      logger,
+      buildTarget: "test",
+    });
+  }
+
+  const deterministicWinLevel: LevelDefinition = {
+    id: 1999,
+    chapterId: "test",
+    indexInChapter: 1,
+    moves: 8,
+    palette: ["ruby", "sapphire", "emerald"],
+    objective: { type: "clear_all" },
+    layout: [
+      ". . . . . . . .",
+      ". . . R R . . .",
+      ". . . . . . . .",
+      ". . . . . . . .",
+      ". . . . . . . .",
+      ". . . . . . . .",
+    ],
+    queue: ["ruby"],
+    rewards: {
+      gold: 100,
+      petals: 10,
+      seasonalTokens: 0,
+    },
+    difficulty: "easy",
+  };
+
+  it("boots first-time users into the daily reward flow", async () => {
+    const session = createSession();
+    await session.boot();
+
+    expect(session.getState().bootStatus).toBe("ready");
+    expect(session.getState().currentScreen).toBe("dailyRewards");
+    expect(session.getState().dailyRewardAvailable).toBe(true);
+  });
+
+  it("claims daily reward and persists it across sessions", async () => {
+    const session = createSession();
+    await session.boot();
+    const before = session.getState().save.currencies.gold;
+    await session.claimDailyReward();
+
+    expect(session.getState().currentScreen).toBe("map");
+    expect(session.getState().save.currencies.gold).toBeGreaterThanOrEqual(before);
+    expect(session.getState().save.progression.lastDailyRewardAt).not.toBeNull();
+  });
+
+  it("completes a level, grants rewards, and advances progression", async () => {
+    const session = createSession();
+    await session.boot();
+    await session.startLevel(1);
+
+    const active = session.getState().activeLevel;
+    if (!active) {
+      throw new Error("Expected active level");
+    }
+    active.level.objective = { type: "clear_all" };
+    active.board = createBoardState(deterministicWinLevel);
+
+    await session.fireShot(-1.57);
+
+    expect(session.getState().currentScreen).toBe("win");
+    expect(session.getState().save.progression.currentLevelId).toBeGreaterThan(1);
+    expect(session.getState().save.progression.completedLevels).toContain(1);
+  });
+
+  it("fails a level and can continue after rewarded ad", async () => {
+    const session = createSession();
+    await session.boot();
+    await session.startLevel(2);
+
+    const active = session.getState().activeLevel;
+    if (!active) {
+      throw new Error("Expected active level");
+    }
+    active.board.movesRemaining = 1;
+    active.board.cells = [
+      [null, null, null, null, null, null, null, null],
+      [null, null, null, null, null, null, null, null],
+      [null, null, null, null, null, null, null, null],
+      [null, null, null, null, null, null, null, null],
+      [null, null, null, null, null, null, null, null],
+      [null, null, null, null, null, null, null, null],
+    ];
+    active.board.queue = ["ruby"];
+
+    await session.fireShot(-1.1);
+    expect(session.getState().currentScreen).toBe("fail");
+
+    const continued = await session.continueWithRewarded();
+    expect(continued).toBe(true);
+    expect(session.getState().currentScreen).toBe("level");
+    expect(session.getState().activeLevel?.board.movesRemaining).toBeGreaterThan(1);
+  });
+
+  it("opens shop, purchases an offer, switches language, and submits leaderboard score", async () => {
+    const session = createSession();
+    await session.boot();
+    await session.openScreen("shop");
+    await session.purchaseOffer("starter_pack");
+    await session.setLanguage("ru");
+    await session.submitLeaderboard();
+
+    expect(session.getState().save.currencies.gems).toBeGreaterThan(40);
+    expect(session.getState().locale).toBe("ru");
+    expect(session.getState().leaderboard.length).toBeGreaterThan(0);
+  });
+
+  it("recovers from corrupted saves", async () => {
+    window.localStorage.setItem("bubble-kingdom-test:save", "{broken");
+    const session = createSession();
+    await session.boot();
+
+    expect(session.getState().bootStatus).toBe("ready");
+    expect(session.getState().save.progression.currentLevelId).toBe(1);
+  });
+});

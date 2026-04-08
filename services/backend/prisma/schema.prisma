@@ -1,0 +1,61 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model RemoteConfigOverride {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  valueJson String
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+}
+
+model ExperimentAssignment {
+  id          String   @id @default(cuid())
+  anonymousId String
+  experiment  String
+  variant     String
+  assignedAt  DateTime @default(now())
+
+  @@unique([anonymousId, experiment])
+}
+
+model AnalyticsEventLog {
+  id         String   @id @default(cuid())
+  name       String
+  payloadJson String
+  sessionId  String
+  anonymousId String
+  userId     String?
+  createdAt  DateTime @default(now())
+}
+
+model LiveopsSchedule {
+  id          String   @id @default(cuid())
+  eventId     String   @unique
+  startsAt    DateTime
+  endsAt      DateTime
+  payloadJson String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model ShopOfferOverride {
+  id         String   @id @default(cuid())
+  offerId    String   @unique
+  valueJson  String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model ContentRegistry {
+  id           String   @id @default(cuid())
+  version      String   @unique
+  checksum     String
+  publishedAt  DateTime @default(now())
+}

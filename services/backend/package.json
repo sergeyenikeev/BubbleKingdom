@@ -1,0 +1,27 @@
+{
+  "name": "@bubble-kingdom/backend",
+  "version": "0.1.0-alpha",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsup src/server.ts --format esm",
+    "start": "node dist/server.js",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "prisma:generate": "prisma generate",
+    "prisma:push": "prisma db push"
+  },
+  "dependencies": {
+    "@bubble-kingdom/analytics": "workspace:*",
+    "@bubble-kingdom/config": "workspace:*",
+    "@bubble-kingdom/game-data": "workspace:*",
+    "@bubble-kingdom/shared": "workspace:*",
+    "@fastify/cors": "^11.1.0",
+    "@prisma/client": "^6.6.0",
+    "fastify": "^5.2.2",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "prisma": "^6.6.0"
+  }
+}

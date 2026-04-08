@@ -1,0 +1,29 @@
+{
+  "name": "@bubble-kingdom/game-web",
+  "version": "0.1.0-alpha",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "build:yandex": "vite build --mode yandex",
+    "build:vk": "vite build --mode vk",
+    "pack:yandex": "corepack pnpm build:yandex && node ./scripts/pack-yandex.mjs",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@bubble-kingdom/analytics": "workspace:*",
+    "@bubble-kingdom/config": "workspace:*",
+    "@bubble-kingdom/game-core": "workspace:*",
+    "@bubble-kingdom/game-data": "workspace:*",
+    "@bubble-kingdom/platform-sdk": "workspace:*",
+    "@bubble-kingdom/shared": "workspace:*",
+    "phaser": "^3.90.0"
+  },
+  "devDependencies": {
+    "archiver": "^7.0.1",
+    "vite": "^6.3.1",
+    "vite-tsconfig-paths": "^5.1.4"
+  }
+}
