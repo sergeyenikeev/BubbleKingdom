@@ -31,4 +31,20 @@ describe("mock platform adapter", () => {
     expect(receipt?.productId).toBe("starter_pack");
     expect(receipt?.purchaseToken).toContain("purchase_");
   });
+
+  it("returns the full mock shop catalog for local monetization flows", async () => {
+    const adapter = createMockPlatformAdapter({
+      buildTarget: "test",
+      platformTarget: "web-mock",
+      analyticsSinks: [],
+    });
+
+    const catalog = await adapter.purchases.getCatalog();
+    const productIds = catalog.map((product) => product.id);
+
+    expect(productIds).toContain("welcome_offer");
+    expect(productIds).toContain("piggy_bank");
+    expect(productIds).toContain("season_pass");
+    expect(catalog).toHaveLength(10);
+  });
 });

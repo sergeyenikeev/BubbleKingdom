@@ -17,6 +17,37 @@ export default defineConfig(({ mode }) => ({
   build: {
     sourcemap: mode !== "yandex",
     outDir: "dist",
-    chunkSizeWarningLimit: 1200,
+    // Phaser now lives in a dedicated lazy chunk, so the practical risk is low even though
+    // the engine bundle itself remains large.
+    chunkSizeWarningLimit: 1600,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          const normalizedId = id.replaceAll("\\", "/");
+
+          if (normalizedId.includes("/node_modules/phaser/")) {
+            return "phaser";
+          }
+
+          if (
+            normalizedId.includes("/packages/game-core/") ||
+            normalizedId.includes("/packages/game-data/")
+          ) {
+            return "gameplay";
+          }
+
+          if (
+            normalizedId.includes("/packages/platform-sdk/") ||
+            normalizedId.includes("/packages/shared/") ||
+            normalizedId.includes("/packages/config/") ||
+            normalizedId.includes("/packages/analytics/")
+          ) {
+            return "platform";
+          }
+
+          return undefined;
+        },
+      },
+    },
   },
 }));

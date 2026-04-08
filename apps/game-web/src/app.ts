@@ -2,8 +2,6 @@ import { chapters, questDefinitions } from "@bubble-kingdom/game-data";
 import type { GameSession, GameSessionState, ScreenId } from "@bubble-kingdom/game-core";
 import { calculateExtraMovesGemCost, totalStars, translate } from "@bubble-kingdom/game-core";
 
-import { GameRenderer } from "./phaser/GameRenderer";
-
 export function mountApp(root: HTMLElement, session: GameSession, debugEnabled: boolean) {
   root.innerHTML = `
     <div class="app-shell">
@@ -19,21 +17,70 @@ export function mountApp(root: HTMLElement, session: GameSession, debugEnabled: 
     throw new Error("App mount points were not found.");
   }
 
-  const renderer = new GameRenderer(canvasHost, {
-    onPreview: (angle) => session.previewShot(angle),
-    onShoot: (angle) => {
-      void session.fireShot(angle);
-    },
-  });
+  let renderer: RendererHandle | null = null;
+  let rendererPromise: Promise<RendererHandle | null> | null = null;
+  let latestState: GameSessionState | null = null;
+  let warmupScheduled = false;
+  let disposed = false;
+
+  const ensureRenderer = () => {
+    if (renderer) {
+      return Promise.resolve(renderer);
+    }
+
+    if (!rendererPromise) {
+      rendererPromise = import("./phaser/GameRenderer")
+        .then(({ GameRenderer }) => {
+          if (disposed) {
+            return null;
+          }
+
+          const nextRenderer = new GameRenderer(canvasHost, {
+            onPreview: (angle) => session.previewShot(angle),
+            onShoot: (angle) => {
+              void session.fireShot(angle);
+            },
+          });
+          renderer = nextRenderer;
+          if (latestState) {
+            nextRenderer.render(latestState);
+          }
+          return nextRenderer;
+        })
+        .catch((error) => {
+          rendererPromise = null;
+          if (!disposed) {
+            console.error("Bubble Kingdom renderer failed to load.", error);
+          }
+          return null;
+        });
+    }
+
+    return rendererPromise;
+  };
 
   const unsubscribe = session.subscribe((state) => {
-    renderer.render(state);
-    canvasHost.classList.toggle(
-      "is-hidden",
-      state.currentScreen !== "level" &&
-        state.currentScreen !== "win" &&
-        state.currentScreen !== "fail",
-    );
+    latestState = state;
+    const gameplayVisible = isGameplayScreen(state.currentScreen);
+
+    if (renderer) {
+      renderer.render(state);
+    } else if (gameplayVisible) {
+      void ensureRenderer().then((loadedRenderer) => {
+        if (loadedRenderer) {
+          loadedRenderer.render(state);
+        }
+      });
+    } else if (state.bootStatus === "ready" && !warmupScheduled) {
+      warmupScheduled = true;
+      window.setTimeout(() => {
+        if (!disposed) {
+          void ensureRenderer();
+        }
+      }, 350);
+    }
+
+    canvasHost.classList.toggle("is-hidden", !gameplayVisible);
     renderUi(uiLayer, state, debugEnabled);
   });
 
@@ -92,9 +139,15 @@ export function mountApp(root: HTMLElement, session: GameSession, debugEnabled: 
   });
 
   return () => {
+    disposed = true;
     unsubscribe();
-    renderer.destroy();
+    renderer?.destroy();
   };
+}
+
+interface RendererHandle {
+  render(state: GameSessionState): void;
+  destroy(): void;
 }
 
 function renderUi(root: HTMLElement, state: GameSessionState, debugEnabled: boolean) {
@@ -349,6 +402,10 @@ function renderOfferRewards(
     entries.push(`${amount} ${t(`booster.${boosterId}`)}`);
   }
   return entries.join(" | ");
+}
+
+function isGameplayScreen(screen: ScreenId) {
+  return screen === "level" || screen === "win" || screen === "fail";
 }
 
 function isScreenId(value: string | undefined): value is ScreenId {
