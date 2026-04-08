@@ -9,3 +9,5 @@ The project follows Semantic Versioning and Conventional Commits.
 - Initialized the Bubble Kingdom monorepo foundation and execution plan.
 - Added the Phaser web client, platform adapters, deterministic game-core modules, and optional Fastify backend.
 - Added save versioning, analytics scaffolding, experiments, Yandex packaging, CI, smoke tests, and moderation-oriented documentation.
+- Added rewarded double-win claims, gem-paid continues, piggy bank bonus payout logic, and dynamic shop offer visibility.
+- Hardened monetization flows with currency delta analytics, safer continue-state guards, and mock storage isolation for reliable cross-session tests.

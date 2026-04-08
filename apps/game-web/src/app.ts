@@ -1,6 +1,6 @@
 import { chapters, questDefinitions } from "@bubble-kingdom/game-data";
 import type { GameSession, GameSessionState, ScreenId } from "@bubble-kingdom/game-core";
-import { totalStars, translate } from "@bubble-kingdom/game-core";
+import { calculateExtraMovesGemCost, totalStars, translate } from "@bubble-kingdom/game-core";
 
 import { GameRenderer } from "./phaser/GameRenderer";
 
@@ -65,6 +65,10 @@ export function mountApp(root: HTMLElement, session: GameSession, debugEnabled: 
       void session.restoreArea(id);
     } else if (action === "continue-rewarded") {
       void session.continueWithRewarded();
+    } else if (action === "continue-gems") {
+      void session.continueWithGems();
+    } else if (action === "claim-win-bonus") {
+      void session.claimWinBonusRewarded();
     } else if (action === "restart-level") {
       void session.restartLevel();
     } else if (action === "acknowledge-level") {
@@ -260,7 +264,14 @@ function renderOverlay(
   if (state.currentScreen === "win" || state.currentScreen === "fail") {
     const win = state.currentScreen === "win";
     const board = state.activeLevel?.board;
-    return `<div class="overlay-modal"><div class="panel modal-card"><div class="panel-actions"><span class="tag">${win ? t("level.win") : t("level.fail")}</span><span class="tag">${t("ui.score")} ${board?.score ?? 0}</span></div><h2>${win ? t("level.winFlavor") : t("level.failFlavor")}</h2><div class="cta-row">${win ? `<button class="primary-btn" data-action="acknowledge-level">${t("map.continue")}</button>` : `<button class="primary-btn" data-action="continue-rewarded">${t("level.resume")}</button>`}<button class="secondary-btn" data-action="restart-level">${t("level.retry")}</button><button class="ghost-btn" data-action="acknowledge-level">${t("screen.map")}</button></div></div></div>`;
+    const gemContinueCost =
+      state.activeLevel
+        ? calculateExtraMovesGemCost(
+            state.activeLevel.continueOffersUsed,
+            state.remoteConfig,
+          )
+        : 0;
+    return `<div class="overlay-modal"><div class="panel modal-card"><div class="panel-actions"><span class="tag">${win ? t("level.win") : t("level.fail")}</span><span class="tag">${t("ui.score")} ${board?.score ?? 0}</span></div><h2>${win ? t("level.winFlavor") : t("level.failFlavor")}</h2><div class="cta-row">${win ? `<button class="primary-btn" data-action="acknowledge-level">${t("map.continue")}</button>${state.activeLevel?.winBonusClaimed ? `<button class="ghost-btn" disabled>${t("reward.doubleClaimed")}</button>` : `<button class="secondary-btn" data-action="claim-win-bonus">${t("reward.doubleClaim")}</button>`}` : `<button class="primary-btn" data-action="continue-rewarded">${t("reward.watchAdContinue")}</button><button class="secondary-btn" data-action="continue-gems">${t("level.continueWithGems")} ${gemContinueCost} ${t("currency.gems")}</button><button class="ghost-btn" data-action="restart-level">${t("level.retry")}</button>`}<button class="ghost-btn" data-action="acknowledge-level">${t("screen.map")}</button></div></div></div>`;
   }
 
   return `<div class="overlay-modal"><div class="panel modal-card">${renderModalContent(
@@ -280,7 +291,7 @@ function renderModalContent(
   }
 
   if (state.currentScreen === "shop") {
-    return `<div class="panel-actions"><span class="tag">${t("screen.shop")}</span><button class="ghost-btn" data-action="open-screen" data-id="map">${t("screen.map")}</button></div><div class="offer-grid">${state.shopOffers.map((offer) => `<div class="offer-card"><div class="panel-actions"><strong>${t(offer.titleKey)}</strong>${offer.badgeKey ? `<span class="tag">${t(offer.badgeKey)}</span>` : ""}</div><div class="small">${t(offer.descriptionKey)}</div><div class="small">${offer.platformPriceLabel}</div><button class="primary-btn" data-action="purchase-offer" data-id="${offer.id}">${t("shop.buy")}</button></div>`).join("")}</div>`;
+    return `<div class="panel-actions"><span class="tag">${t("screen.shop")}</span><button class="ghost-btn" data-action="open-screen" data-id="map">${t("screen.map")}</button></div><div class="offer-grid">${state.shopOffers.map((offer) => `<div class="offer-card"><div class="panel-actions"><strong>${t(offer.titleKey)}</strong>${offer.badgeKey ? `<span class="tag">${t(offer.badgeKey)}</span>` : ""}</div><div class="small">${t(offer.descriptionKey)}</div><div class="small">${renderOfferRewards(offer, t)}</div>${offer.helperText ? `<div class="small">${t("shop.piggy.progress")} ${offer.helperText}</div>` : ""}<div class="small">${offer.platformPriceLabel}</div><button class="primary-btn" data-action="purchase-offer" data-id="${offer.id}">${t("shop.buy")}</button></div>`).join("")}</div>`;
   }
 
   if (state.currentScreen === "quests") {
@@ -312,6 +323,32 @@ function renderDebug(state: GameSessionState) {
 
 function currencyPill(label: string, value: number) {
   return `<div class="currency-pill"><span class="small">${label}</span><strong>${value}</strong></div>`;
+}
+
+function renderOfferRewards(
+  offer: GameSessionState["shopOffers"][number],
+  t: (key: string) => string,
+) {
+  const entries: string[] = [];
+  if (offer.rewards.gold) {
+    entries.push(`${offer.rewards.gold} ${t("currency.gold")}`);
+  }
+  if (offer.rewards.petals) {
+    entries.push(`${offer.rewards.petals} ${t("currency.petals")}`);
+  }
+  if (offer.rewards.gems) {
+    entries.push(`${offer.rewards.gems} ${t("currency.gems")}`);
+  }
+  if (offer.rewards.seasonalTokens) {
+    entries.push(`${offer.rewards.seasonalTokens} ${t("currency.seasonalTokens")}`);
+  }
+  for (const [boosterId, amount] of Object.entries(offer.rewards.boosters ?? {})) {
+    if (!amount) {
+      continue;
+    }
+    entries.push(`${amount} ${t(`booster.${boosterId}`)}`);
+  }
+  return entries.join(" | ");
 }
 
 function isScreenId(value: string | undefined): value is ScreenId {

@@ -136,6 +136,35 @@ describe("game session integration", () => {
     expect(session.getState().activeLevel?.board.movesRemaining).toBeGreaterThan(1);
   });
 
+  it("can spend gems for extra moves after a fail", async () => {
+    const session = createSession();
+    await session.boot();
+    await session.startLevel(2);
+
+    const active = session.getState().activeLevel;
+    if (!active) {
+      throw new Error("Expected active level");
+    }
+    active.board.movesRemaining = 1;
+    active.board.cells = [
+      [null, null, null, null, null, null, null, null],
+      [null, null, null, null, null, null, null, null],
+      [null, null, null, null, null, null, null, null],
+      [null, null, null, null, null, null, null, null],
+      [null, null, null, null, null, null, null, null],
+      [null, null, null, null, null, null, null, null],
+    ];
+    active.board.queue = ["ruby"];
+
+    await session.fireShot(-1.1);
+    const gemsBefore = session.getState().save.currencies.gems;
+
+    const continued = await session.continueWithGems();
+    expect(continued).toBe(true);
+    expect(session.getState().currentScreen).toBe("level");
+    expect(session.getState().save.currencies.gems).toBeLessThan(gemsBefore);
+  });
+
   it("opens shop, purchases an offer, switches language, and submits leaderboard score", async () => {
     const session = createSession();
     await session.boot();
@@ -147,6 +176,41 @@ describe("game session integration", () => {
     expect(session.getState().save.currencies.gems).toBeGreaterThan(40);
     expect(session.getState().locale).toBe("ru");
     expect(session.getState().leaderboard.length).toBeGreaterThan(0);
+  });
+
+  it("grants a rewarded double-win bonus and refreshes monetization state", async () => {
+    const session = createSession();
+    await session.boot();
+    await session.startLevel(1);
+
+    const active = session.getState().activeLevel;
+    if (!active) {
+      throw new Error("Expected active level");
+    }
+    active.level.objective = { type: "clear_all" };
+    active.board = createBoardState(deterministicWinLevel);
+
+    await session.fireShot(-1.57);
+    const goldAfterWin = session.getState().save.currencies.gold;
+
+    const doubled = await session.claimWinBonusRewarded();
+    expect(doubled).toBe(true);
+    expect(session.getState().save.currencies.gold).toBeGreaterThan(goldAfterWin);
+    expect(session.getState().activeLevel?.winBonusClaimed).toBe(true);
+  });
+
+  it("removes one-time and permanent offers after relevant purchases", async () => {
+    const session = createSession();
+    await session.boot();
+
+    expect(session.getState().shopOffers.some((offer) => offer.id === "welcome_offer")).toBe(true);
+    expect(session.getState().shopOffers.some((offer) => offer.id === "no_ads")).toBe(true);
+
+    await session.purchaseOffer("starter_pack");
+    expect(session.getState().shopOffers.some((offer) => offer.id === "welcome_offer")).toBe(false);
+
+    await session.purchaseOffer("no_ads");
+    expect(session.getState().shopOffers.some((offer) => offer.id === "no_ads")).toBe(false);
   });
 
   it("recovers from corrupted saves", async () => {

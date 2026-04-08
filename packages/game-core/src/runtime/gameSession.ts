@@ -32,7 +32,10 @@ import type { BoardState, ResolutionSummary, ShotTrace } from "../board/types";
 import {
   applyRewardGrant,
   applyShopOffer,
+  calculateExtraMovesGemCost,
+  calculatePiggyBankBonusGems,
   calculatePiggyBankProgress,
+  spendCurrency,
 } from "../economy/economy";
 import { assignExperimentVariants } from "../features/featureFlags";
 import { translate } from "../localization/messages";
@@ -68,10 +71,14 @@ export interface ActiveLevelSession {
   preview: ShotTrace | null;
   lastSummary: ResolutionSummary | null;
   continueUsed: boolean;
+  continueOffersUsed: number;
+  winReward: RewardGrant | null;
+  winBonusClaimed: boolean;
 }
 
 export interface DecoratedShopOffer extends ShopOfferDefinition {
   platformPriceLabel: string;
+  helperText?: string;
 }
 
 export interface GameSessionState {
@@ -106,6 +113,8 @@ export interface GameSession {
   fireShot(angleRadians: number): Promise<void>;
   restartLevel(): Promise<void>;
   continueWithRewarded(): Promise<boolean>;
+  continueWithGems(): Promise<boolean>;
+  claimWinBonusRewarded(): Promise<boolean>;
   useBooster(boosterId: BoosterId): Promise<boolean>;
   claimDailyReward(): Promise<void>;
   claimQuest(questId: string): Promise<void>;
@@ -178,22 +187,78 @@ export function createGameSession(input: {
     });
   };
 
-  const resolveShopOffers = async (): Promise<DecoratedShopOffer[]> => {
-    const platformCatalog = await input.platform.purchases.getCatalog().catch(() => []);
+  const decorateShopOffers = (
+    save: PlayerSave,
+    platformCatalog: PlatformProduct[],
+    remoteConfig: RemoteConfig = state.remoteConfig,
+  ): DecoratedShopOffer[] => {
     const catalogById = new Map(platformCatalog.map((item) => [item.id, item]));
 
+    return shopCatalog.flatMap((offer) => {
+      if (offer.type === "no_ads" && save.economy.noAdsPurchased) {
+        return [];
+      }
+      if (
+        offer.type === "welcome_offer" &&
+        (save.economy.firstPurchaseAt !== null || save.progression.currentLevelId > 10)
+      ) {
+        return [];
+      }
+
+      let helperText: string | undefined;
+      let rewards = offer.rewards;
+      let badgeKey = offer.badgeKey;
+      if (offer.type === "piggy_bank") {
+        rewards = {
+          ...offer.rewards,
+          gems: (offer.rewards.gems ?? 0) + calculatePiggyBankBonusGems(save),
+        };
+        helperText = `${save.economy.piggyBankGold}/${remoteConfig.economy.piggyBankCap}`;
+        if (save.economy.piggyBankGold >= remoteConfig.economy.piggyBankCap) {
+          badgeKey = "shop.badge.full";
+        } else {
+          badgeKey = "shop.badge.progress";
+        }
+      }
+
+      const decorated: DecoratedShopOffer = {
+        ...offer,
+        rewards,
+        platformPriceLabel:
+          ("platformPriceId" in offer.price
+            ? catalogById.get(offer.price.platformPriceId)?.price
+            : undefined) ??
+          (offer.type === "no_ads" ? "249 RUB" : "149 RUB"),
+      };
+      if (badgeKey) {
+        decorated.badgeKey = badgeKey;
+      }
+      if (helperText) {
+        decorated.helperText = helperText;
+      }
+      return [decorated];
+    });
+  };
+
+  const resolveShopOffers = async (
+    save: PlayerSave = state.save,
+    remoteConfig: RemoteConfig = state.remoteConfig,
+  ): Promise<DecoratedShopOffer[]> => {
+    const platformCatalog = await input.platform.purchases.getCatalog().catch(() => []);
     updateState({
       platformCatalog,
     });
 
-    return shopCatalog.map((offer) => ({
-      ...offer,
-      platformPriceLabel:
-        ("platformPriceId" in offer.price
-          ? catalogById.get(offer.price.platformPriceId)?.price
-          : undefined) ??
-        (offer.type === "no_ads" ? "249 RUB" : "149 RUB"),
-    }));
+    return decorateShopOffers(save, platformCatalog, remoteConfig);
+  };
+
+  const refreshShopOffers = (
+    save: PlayerSave = state.save,
+    remoteConfig: RemoteConfig = state.remoteConfig,
+  ) => {
+    updateState({
+      shopOffers: decorateShopOffers(save, state.platformCatalog, remoteConfig),
+    });
   };
 
   const refreshDailyRewardState = async () => {
@@ -210,6 +275,39 @@ export function createGameSession(input: {
     updateState({
       tutorialStep: getNextTutorialStep(state.save, state.remoteConfig),
     });
+  };
+
+  const trackCurrencyDelta = async (
+    before: PlayerSave,
+    after: PlayerSave,
+    source: string,
+    extra: Record<string, unknown> = {},
+  ) => {
+    const currencies: Array<keyof PlayerSave["currencies"]> = [
+      "gold",
+      "petals",
+      "gems",
+      "seasonalTokens",
+    ];
+
+    for (const currency of currencies) {
+      const delta = after.currencies[currency] - before.currencies[currency];
+      if (delta > 0) {
+        await input.platform.analytics.track("currency_earned", {
+          currency,
+          amount: delta,
+          source,
+          ...extra,
+        });
+      } else if (delta < 0) {
+        await input.platform.analytics.track("currency_spent", {
+          currency,
+          amount: Math.abs(delta),
+          source,
+          ...extra,
+        });
+      }
+    }
   };
 
   const openScreenInternal = async (screen: ScreenId) => {
@@ -253,6 +351,9 @@ export function createGameSession(input: {
         preview: null,
         lastSummary: null,
         continueUsed: false,
+        continueOffersUsed: 0,
+        winReward: null,
+        winBonusClaimed: false,
       },
     });
     await input.platform.ads.setStickyBannerVisible(false);
@@ -301,17 +402,18 @@ export function createGameSession(input: {
         input.platform.session.anonymousId,
         remoteConfig,
       );
-      const shopOffers = await resolveShopOffers();
+      const saveWithExperiments = {
+        ...saveWithQuests,
+        experiments,
+      };
+      const shopOffers = await resolveShopOffers(saveWithExperiments, remoteConfig);
 
       updateState({
         bootStatus: "ready",
         currentScreen: "map",
         locale: saveWithQuests.settings.language ?? locale,
         remoteConfig,
-        save: {
-          ...saveWithQuests,
-          experiments,
-        },
+        save: saveWithExperiments,
         shopOffers,
         eventId: remoteConfig.liveops.currentEventId,
       });
@@ -348,6 +450,7 @@ export function createGameSession(input: {
         return;
       }
 
+      const beforeShotSave = state.save;
       const summary = performShot(levelSession.board, levelSession.level, angleRadians);
       levelSession.lastSummary = summary;
       levelSession.preview = null;
@@ -376,6 +479,7 @@ export function createGameSession(input: {
             ),
           },
         });
+        refreshShopOffers(state.save);
       }
 
       await input.platform.analytics.track("level_objective_progress", {
@@ -394,45 +498,52 @@ export function createGameSession(input: {
 
         const completedLevels = new Set(state.save.progression.completedLevels);
         completedLevels.add(levelSession.level.id);
-        const updatedSave = applyRewardGrant(state.save, levelReward);
-
-        updateState({
-          currentScreen: "win",
-          save: {
-            ...updatedSave,
+        const rewardedSave = applyRewardGrant(state.save, levelReward);
+        const progressedSave = applyQuestProgress(
+          {
+            ...rewardedSave,
             progression: {
-              ...updatedSave.progression,
+              ...rewardedSave.progression,
               currentLevelId: Math.max(
-                updatedSave.progression.currentLevelId,
+                rewardedSave.progression.currentLevelId,
                 levelSession.level.id + 1,
               ),
               completedLevels: [...completedLevels].sort((left, right) => left - right),
               starsByLevel: {
-                ...updatedSave.progression.starsByLevel,
+                ...rewardedSave.progression.starsByLevel,
                 [String(levelSession.level.id)]: Math.max(
-                  updatedSave.progression.starsByLevel[String(levelSession.level.id)] ?? 0,
+                  rewardedSave.progression.starsByLevel[String(levelSession.level.id)] ?? 0,
                   levelSession.board.starsEarned,
                 ),
               },
             },
           },
-        });
+          questDefinitions,
+          {
+            levels_complete: 1,
+            stars_earned: levelSession.board.starsEarned,
+            gold_earned: levelReward.gold ?? 0,
+          },
+          new Date().toISOString(),
+        );
 
         updateState({
-          save: applyQuestProgress(
-            state.save,
-            questDefinitions,
-            {
-              levels_complete: 1,
-              stars_earned: levelSession.board.starsEarned,
-            },
-            new Date().toISOString(),
-          ),
+          currentScreen: "win",
+          save: progressedSave,
+          activeLevel: {
+            ...levelSession,
+            winReward: levelReward,
+            winBonusClaimed: false,
+          },
         });
+        refreshShopOffers(progressedSave);
 
         addNotification(
-          `${translate(state.locale, "level.win")} +${levelReward.gold ?? 0} gold`,
+          `${translate(state.locale, "level.win")} +${levelReward.gold ?? 0} ${translate(state.locale, "currency.gold")}`,
         );
+        await trackCurrencyDelta(beforeShotSave, progressedSave, "level_complete", {
+          levelId: levelSession.level.id,
+        });
         await input.platform.analytics.track("level_complete", {
           levelId: levelSession.level.id,
           stars: levelSession.board.starsEarned,
@@ -466,7 +577,11 @@ export function createGameSession(input: {
       await startLevelInternal(state.activeLevel.level.id);
     },
     async continueWithRewarded() {
-      if (!state.activeLevel || state.activeLevel.continueUsed) {
+      if (
+        !state.activeLevel ||
+        state.currentScreen !== "fail" ||
+        state.activeLevel.continueUsed
+      ) {
         return false;
       }
 
@@ -486,16 +601,24 @@ export function createGameSession(input: {
 
       state.activeLevel.board.movesRemaining += state.remoteConfig.ads.continueRewardMoves;
       state.activeLevel.continueUsed = true;
-      updateState({
-        currentScreen: "level",
-        save: {
+      state.activeLevel.continueOffersUsed += 1;
+      const rewardedSave = applyQuestProgress(
+        {
           ...state.save,
           economy: {
             ...state.save.economy,
             rewardedViews: state.save.economy.rewardedViews + 1,
           },
         },
+        questDefinitions,
+        { rewarded_watch: 1 },
+        new Date().toISOString(),
+      );
+      updateState({
+        currentScreen: "level",
+        save: rewardedSave,
       });
+      refreshShopOffers(rewardedSave);
       await input.platform.lifecycle.startGameplay();
       await input.platform.analytics.track("rewarded_finished", {
         reason: "continue_after_fail",
@@ -504,6 +627,107 @@ export function createGameSession(input: {
         reason: "continue_after_fail",
         moves: state.remoteConfig.ads.continueRewardMoves,
       });
+      await persist();
+      return true;
+    },
+    async continueWithGems() {
+      if (
+        !state.activeLevel ||
+        state.currentScreen !== "fail" ||
+        state.activeLevel.continueUsed
+      ) {
+        return false;
+      }
+
+      const gemCost = calculateExtraMovesGemCost(
+        state.activeLevel.continueOffersUsed,
+        state.remoteConfig,
+      );
+      if (state.save.currencies.gems < gemCost) {
+        addNotification(translate(state.locale, "economy.notEnoughGems"));
+        return false;
+      }
+
+      const beforeSave = state.save;
+      const updated = spendCurrency(state.save, "gems", gemCost);
+      state.activeLevel.board.movesRemaining += state.remoteConfig.ads.continueRewardMoves;
+      state.activeLevel.continueUsed = true;
+      state.activeLevel.continueOffersUsed += 1;
+      updateState({
+        currentScreen: "level",
+        save: updated,
+      });
+      refreshShopOffers(updated);
+      await input.platform.lifecycle.startGameplay();
+      await trackCurrencyDelta(beforeSave, updated, "continue_with_gems", {
+        cost: gemCost,
+        levelId: state.activeLevel.level.id,
+      });
+      await persist();
+      return true;
+    },
+    async claimWinBonusRewarded() {
+      if (
+        !state.activeLevel ||
+        state.currentScreen !== "win" ||
+        state.activeLevel.winBonusClaimed ||
+        !state.activeLevel.winReward
+      ) {
+        return false;
+      }
+
+      await input.platform.analytics.track("rewarded_offer_shown", {
+        reason: "double_win_reward",
+      });
+      await input.platform.analytics.track("rewarded_started", {
+        reason: "double_win_reward",
+      });
+      const outcome = await input.platform.ads.showRewarded("double_win_reward");
+      if (!outcome.rewarded) {
+        await input.platform.analytics.track("rewarded_failed", {
+          reason: "double_win_reward",
+        });
+        return false;
+      }
+
+      const beforeSave = state.save;
+      const bonusGrant = createWinBonusReward(
+        state.activeLevel.winReward,
+        state.remoteConfig.ads.rewardDoubleRewardMultiplier,
+      );
+      const updated = applyQuestProgress(
+        {
+          ...applyRewardGrant(state.save, bonusGrant),
+          economy: {
+            ...state.save.economy,
+            rewardedViews: state.save.economy.rewardedViews + 1,
+          },
+        },
+        questDefinitions,
+        { rewarded_watch: 1, gold_earned: bonusGrant.gold ?? 0 },
+        new Date().toISOString(),
+      );
+      state.activeLevel.winBonusClaimed = true;
+      updateState({
+        save: updated,
+        activeLevel: {
+          ...state.activeLevel,
+          winBonusClaimed: true,
+        },
+      });
+      refreshShopOffers(updated);
+      await input.platform.analytics.track("rewarded_finished", {
+        reason: "double_win_reward",
+      });
+      await input.platform.analytics.track("rewarded_reward_granted", {
+        reason: "double_win_reward",
+        multiplier: state.remoteConfig.ads.rewardDoubleRewardMultiplier,
+      });
+      await trackCurrencyDelta(beforeSave, updated, "double_win_reward", {
+        levelId: state.activeLevel.level.id,
+      });
+      addNotification(translate(state.locale, "reward.doubleClaimed"));
+      await persist();
       return true;
     },
     async useBooster(boosterId) {
@@ -528,7 +752,7 @@ export function createGameSession(input: {
       } else if (boosterId === "bombOrb") {
         state.activeLevel.board.queue.unshift("bomb");
       } else if (boosterId === "precisionAim") {
-        addNotification("Precision Aim active");
+        addNotification(translate(state.locale, "booster.precisionAim.active"));
       } else if (boosterId === "extraMoves") {
         state.activeLevel.board.movesRemaining += 3;
       } else if (boosterId === "undoShot") {
@@ -544,6 +768,7 @@ export function createGameSession(input: {
       return true;
     },
     async claimDailyReward() {
+      const beforeSave = state.save;
       const result = claimDailyReward(
         state.save,
         await input.platform.serverTime.now(),
@@ -554,18 +779,25 @@ export function createGameSession(input: {
         currentScreen: "map",
         dailyRewardAvailable: false,
       });
+      refreshShopOffers(result.save);
       await input.platform.analytics.track("daily_reward_claimed", {
+        day: result.reward.day,
+      });
+      await trackCurrencyDelta(beforeSave, result.save, "daily_reward", {
         day: result.reward.day,
       });
       addNotification(`${translate(state.locale, "daily.title")} +${result.reward.day}`);
       await persist();
     },
     async claimQuest(questId) {
+      const beforeSave = state.save;
       const result = claimQuestReward(state.save, questDefinitions, questId);
       updateState({
         save: result.save,
       });
+      refreshShopOffers(result.save);
       await input.platform.analytics.track("quest_claimed", { questId });
+      await trackCurrencyDelta(beforeSave, result.save, "quest", { questId });
       addNotification(translate(state.locale, "quest.claim"));
       await persist();
     },
@@ -577,21 +809,33 @@ export function createGameSession(input: {
       await input.platform.analytics.track("iap_offer_view", { offerId });
       await input.platform.analytics.track("iap_start", { offerId });
 
-      const receipt = await input.platform.purchases.purchase(
-        offer.yandexProductId ?? offer.sku,
-        JSON.stringify({ offerId }),
-      );
+      let receipt: Awaited<ReturnType<PlatformAdapter["purchases"]["purchase"]>>;
+      try {
+        receipt = await input.platform.purchases.purchase(
+          offer.yandexProductId ?? offer.sku,
+          JSON.stringify({ offerId }),
+        );
+      } catch (error) {
+        await input.platform.analytics.track("iap_failed", {
+          offerId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        throw error;
+      }
       if (!receipt) {
         await input.platform.analytics.track("iap_cancel", { offerId });
         return;
       }
 
+      const beforeSave = state.save;
       const updated = applyShopOffer(state.save, offer);
       updateState({
         save: updated,
       });
+      refreshShopOffers(updated);
       await input.platform.analytics.track("iap_success", { offerId });
-      addNotification(`${translate(state.locale, offer.titleKey)} acquired`);
+      await trackCurrencyDelta(beforeSave, updated, "shop_purchase", { offerId });
+      addNotification(`${translate(state.locale, offer.titleKey)} ${translate(state.locale, "shop.acquired")}`);
       await persist();
     },
     async restoreArea(nodeId) {
@@ -599,21 +843,22 @@ export function createGameSession(input: {
       if (!node) {
         throw new Error(`Unknown restoration node ${nodeId}`);
       }
+      const beforeSave = state.save;
       await input.platform.analytics.track("meta_restore_started", { nodeId });
+      const restoredSave = restoreNode(state.save, node);
+      const updated = applyQuestProgress(
+        restoredSave,
+        questDefinitions,
+        { restoration_completed: 1 },
+        new Date().toISOString(),
+      );
       updateState({
-        save: restoreNode(state.save, node),
+        save: updated,
       });
-
-      updateState({
-        save: applyQuestProgress(
-          state.save,
-          questDefinitions,
-          { restoration_completed: 1 },
-          new Date().toISOString(),
-        ),
-      });
+      refreshShopOffers(updated);
 
       await input.platform.analytics.track("meta_restore_completed", { nodeId });
+      await trackCurrencyDelta(beforeSave, updated, "restoration", { nodeId });
       addNotification(translate(state.locale, node.titleKey));
       await persist();
     },
@@ -622,20 +867,24 @@ export function createGameSession(input: {
       if (!item || item.claimed) {
         return;
       }
+      const beforeSave = state.save;
       const updated = applyRewardGrant(state.save, rewardGrantFromInbox(item));
+      const nextSave = {
+        ...updated,
+        inbox: updated.inbox.map((entry) =>
+          entry.id === itemId
+            ? {
+                ...entry,
+                claimed: true,
+              }
+            : entry,
+        ),
+      };
       updateState({
-        save: {
-          ...updated,
-          inbox: updated.inbox.map((entry) =>
-            entry.id === itemId
-              ? {
-                  ...entry,
-                  claimed: true,
-                }
-              : entry,
-          ),
-        },
+        save: nextSave,
       });
+      refreshShopOffers(nextSave);
+      await trackCurrencyDelta(beforeSave, nextSave, "inbox_claim", { itemId });
       await persist();
     },
     async requestAuth(reason) {
@@ -710,10 +959,14 @@ export function createGameSession(input: {
 
   async function maybeShowInterstitial(reason: string) {
     const completedLevels = state.save.progression.completedLevels.length;
+    const interstitialEvery =
+      state.save.experiments.interstitial_pacing === "soft"
+        ? state.remoteConfig.ads.interstitialEvery + 1
+        : state.remoteConfig.ads.interstitialEvery;
     const eligible =
       !state.save.economy.noAdsPurchased &&
       completedLevels > 0 &&
-      completedLevels % state.remoteConfig.ads.interstitialEvery === 0;
+      completedLevels % interstitialEvery === 0;
 
     if (!eligible) {
       return;
@@ -731,6 +984,16 @@ export function createGameSession(input: {
       });
     }
   }
+}
+
+function createWinBonusReward(baseReward: RewardGrant, multiplier: number): RewardGrant {
+  const bonusMultiplier = Math.max(0, multiplier - 1);
+  return {
+    source: "level_complete",
+    gold: Math.floor((baseReward.gold ?? 0) * bonusMultiplier),
+    petals: Math.floor((baseReward.petals ?? 0) * bonusMultiplier),
+    seasonalTokens: Math.floor((baseReward.seasonalTokens ?? 0) * bonusMultiplier),
+  };
 }
 
 function rewardGrantFromInbox(item: GameSessionState["save"]["inbox"][number]): RewardGrant {

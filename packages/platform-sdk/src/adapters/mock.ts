@@ -28,8 +28,6 @@ const mockProducts: PlatformProduct[] = [
   },
 ];
 
-const sharedMockStorage = new Map<string, string>();
-
 export function createMockPlatformAdapter(options: AdapterRuntimeOptions): PlatformAdapter {
   const storagePrefix = options.storagePrefix ?? "bubble-kingdom";
   const anonymousId = typeof window === "undefined" ? createId("anon") : loadAnonymousId(storagePrefix);
@@ -204,11 +202,9 @@ function createPersistentStorage(prefix: string) {
   const localStorageBridge = createLocalStorageBridge(prefix);
   return {
     async load(key: string) {
-      const local = await localStorageBridge.load(key);
-      return local ?? sharedMockStorage.get(`${prefix}:${key}`) ?? null;
+      return localStorageBridge.load(key);
     },
     async save(key: string, value: string) {
-      sharedMockStorage.set(`${prefix}:${key}`, value);
       await localStorageBridge.save(key, value);
     },
   };

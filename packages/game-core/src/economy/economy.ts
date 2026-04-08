@@ -61,8 +61,20 @@ export function calculatePiggyBankProgress(
   return Math.min(remoteConfig.economy.piggyBankCap, save.economy.piggyBankGold + goldEarned);
 }
 
+export function calculatePiggyBankBonusGems(save: PlayerSave): number {
+  return Math.floor(save.economy.piggyBankGold / 4);
+}
+
 export function applyShopOffer(save: PlayerSave, offer: ShopOfferDefinition): PlayerSave {
-  let updated = applyRewardGrant(save, offer.rewards);
+  const rewards =
+    offer.type === "piggy_bank"
+      ? {
+          ...offer.rewards,
+          gems: (offer.rewards.gems ?? 0) + calculatePiggyBankBonusGems(save),
+        }
+      : offer.rewards;
+
+  let updated = applyRewardGrant(save, rewards);
   if (offer.type === "no_ads") {
     updated = {
       ...updated,
@@ -70,6 +82,16 @@ export function applyShopOffer(save: PlayerSave, offer: ShopOfferDefinition): Pl
         ...updated.economy,
         noAdsPurchased: true,
         adLightPurchased: true,
+      },
+    };
+  }
+
+  if (offer.type === "piggy_bank") {
+    updated = {
+      ...updated,
+      economy: {
+        ...updated.economy,
+        piggyBankGold: 0,
       },
     };
   }
