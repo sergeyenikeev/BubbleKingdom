@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { LanguageCode } from "@bubble-kingdom/shared";
 import type { RemoteConfig } from "@bubble-kingdom/config";
 
-export const SAVE_SCHEMA_VERSION = 3;
+export const SAVE_SCHEMA_VERSION = 4;
 
 export const playerSaveSchema = z.object({
   schemaVersion: z.number(),
@@ -50,6 +50,13 @@ export const playerSaveSchema = z.object({
       claimed: z.boolean(),
       cadence: z.enum(["daily", "weekly"]),
       lastUpdatedAt: z.string(),
+    }),
+  ),
+  events: z.record(
+    z.string(),
+    z.object({
+      claimedMilestones: z.array(z.string()),
+      lastViewedAt: z.string().nullable(),
     }),
   ),
   inbox: z.array(
@@ -138,6 +145,7 @@ export function createDefaultSave(input: {
       lastComebackAt: null,
     },
     quests: {},
+    events: {},
     inbox: [],
     economy: {
       noAdsPurchased: false,

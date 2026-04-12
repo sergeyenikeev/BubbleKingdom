@@ -29,6 +29,7 @@ export const chapters: ChapterDefinition[] = [
     zoneTheme: "blossom-gardens",
     unlockLevel: 1,
     levels: Array.from({ length: 50 }, (_, index) => index + 1),
+    chapterChestStarsRequired: 30,
     restorationNodes: createRestorationNodes("chapter_blossom_gardens"),
     chapterChest: {
       source: "chapter_chest",
@@ -49,6 +50,7 @@ export const chapters: ChapterDefinition[] = [
     zoneTheme: "moonlit-courtyard",
     unlockLevel: 51,
     levels: Array.from({ length: 50 }, (_, index) => index + 51),
+    chapterChestStarsRequired: 45,
     restorationNodes: createRestorationNodes("chapter_moonlit_courtyard"),
     chapterChest: {
       source: "chapter_chest",

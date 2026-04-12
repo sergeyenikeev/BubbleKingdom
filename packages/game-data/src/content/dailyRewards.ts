@@ -6,6 +6,7 @@ export const dailyRewards: DailyRewardStep[] = [
     rewards: {
       source: "daily_reward",
       gold: 200,
+      seasonalTokens: 5,
       boosters: {
         precisionAim: 1,
       },

@@ -19,3 +19,46 @@ The project follows Semantic Versioning and Conventional Commits.
 - Added strict content validation for palettes, tokens, objective targets, chapter sequencing, and a dedicated `pnpm validate:content` CI gate.
 - Added data-driven fail-offer decisioning, piggy-bank spotlight thresholds, and clearer piggy-bank CTAs across the fail flow, map shell, and shop.
 - Hardened Yandex commerce for production by preferring `/sdk.js` in Yandex builds, wiring signed receipts into server validation, and rejecting silent fallback grants when `receiptValidationMode=server`.
+- Added session-guidance helpers, comeback reward inbox flow, tutorial-step progression wiring, current-goal cards, and inbox claim UX for clearer first-session and return-session direction.
+- Added save-load metadata for `save_load` / `save_migration` analytics, plus documentation that maps the working user stories and `TC-001` to `TC-052` QA matrix into repo docs.
+- Added a pre-level briefing flow with objective/reward preview, selectable starter boosters, precision-aim visual assist markers, and new unit/integration/smoke coverage for the level-start decision moment.
+- Hardened localization regression coverage with RU/EN dictionary parity checks, locale auto-detect persistence tests, and a smoke path for visible settings copy updates.
+- Added an explicit Settings CTA on the map shell so language and pause-style controls are reachable from the main progression screen as required by the MVP flow.
+- Added a live-event reward track with persisted milestone claims, event-screen UX, seasonal-token rewards, and content validation for data-driven event progression.
+- Added map-surface guidance for comeback/inbox/chapter/event pressure via current-goal cards, alert chips, nav badges, and a localized active-event summary on the main shell.
+- Extended regression coverage for event progression and map UX with session-surface unit tests, integration around event reward claiming, and smoke assertions for the event summary before entering the full event modal.
+- Added reward-reveal modals for chapter chests and live-event milestone claims so major meta rewards land as explicit emotional beats instead of silent balance changes.
+- Removed the temporary relative `liveEvents` source import in runtime and restored package-based content resolution after confirming source-first integration stability.
+- Added restoration-complete reveal beats so rebuilding a kingdom object now lands as a first-class progression moment instead of only a silent state change.
+- Promoted claimable live-event rewards into the map's current-goal system once the player is out of the earliest tutorial steps, improving event participation without derailing the first two wins.
+- Added chapter-restoration progress helpers plus next-step CTAs inside restoration reveals, so post-restore celebrations now point the player toward the next landmark or back into gameplay.
+- Added restoration-screen progress summaries and a browser smoke path for `restore -> reveal -> next restoration`, tightening regression coverage around the kingdom meta loop.
+- Added chapter-chest follow-up planning so major chapter rewards now spotlight either the newly unlocked zone or the live event, with a direct CTA instead of dropping the player back to the map cold.
+- Added smoke coverage for `chapter chest -> reveal -> event`, tightening regression protection around large meta beats and post-reward routing.
+- Added a one-time chapter-unlock reveal on map entry so opening chapter 2 now lands as an explicit meta beat with a direct CTA into the newly available level flow.
+- Added regression coverage for `new chapter -> reveal -> start next chapter`, protecting the post-unlock route across unit, integration, and browser smoke suites.
+- Added persistent map follow-up spotlights after dismissing major reveal modals, so newly unlocked zones and featured events still surface a clear next CTA on the map instead of disappearing cold.
+- Added a dedicated `Ad Light` offer to the monetization catalog, keeping `No Ads` as a visible upgrade path and validating banner/interstitial suppression behavior separately in integration and smoke.
+- Improved shop transparency for ad purchases with per-offer ad-surface breakdowns, upgrade messaging on `No Ads` after `Ad Light`, and stronger deterministic regression coverage around ad-pacing experiment assignments.
+- Added a persistent shop ad-status card that explains the player's current ad mode, keeps rewarded help explicitly optional, and surfaces a direct `No Ads` upgrade CTA after `Ad Light` is purchased.
+- Promoted `No Ads` to a visually highlighted upgrade card after `Ad Light`, reordered the shop to surface that upgrade earlier, and added smoke coverage for the completed `No Ads active` state.
+- Completed the `No Ads` purchase beat with a single `Back to kingdom` CTA on the ad-status card, so permanent ad removal ends in a clear return-to-play action instead of a dead-end shop state.
+- Added integration and browser smoke coverage for `dismiss reveal -> map spotlight -> follow-up action`, protecting the softer post-reveal guidance path.
+- Added post-claim spotlight planning for daily, comeback, and event reward flows so the map/reveal surface can ignore stale daily prompts and route players toward the next meaningful restore or play beat.
+- Simplified the map hero when a spotlight is active by suppressing the competing current-goal card and default primary Play CTA, leaving one clearer next-step action after major beats.
+- Deduplicated map action-digest chips against active spotlights, so chapter chest, event, and quest follow-up beats no longer echo the same prompt twice in the hero shell.
+- Taught chapter-chest and event side panels to yield to active spotlights by replacing duplicate CTA buttons with a softer “featured above” helper state.
+- Extended spotlight yielding to current-level preview and highlighted restoration targets, so level-play and restore-node spotlights now stay singular across the whole side rail.
+- Added a dedicated daily-reward-to-restoration path: when the first upgrade is already affordable, claiming the daily reward now keeps restoration as the single promoted next step across the hero and restore rail.
+- Extended spotlight yielding to the current-level preview and event summary for any active spotlight, so play/event CTAs no longer compete with restore- or reward-driven next-step beats.
+- Added quest-claim follow-up spotlight planning plus map-spotlight self-healing on map entry, so quest rewards and return-to-map flows always recover a single best next-step CTA instead of dropping to an empty shell.
+- Extended guided UX into overlay screens by highlighting the recommended quest, inbox reward, event milestone, or restoration target after the player opens that screen, instead of losing the next-step context.
+- Hardened restoration CTAs on both the map rail and restoration screen so unaffordable upgrades now show shortfall context and disabled buttons instead of inviting invalid actions.
+- Reworked the daily-rewards modal into a state-aware screen that distinguishes claimable vs already-collected rewards, highlights today or tomorrow appropriately, and removes the misleading second-claim CTA after collection.
+- Added overlay focus cards for quests and event rewards so claimable targets surface one clear CTA at the top of the modal, while the highlighted list card yields its duplicate button and post-claim follow-up can send the player cleanly back to the map.
+- Extended the same overlay-focus pattern to inbox rewards and restoration targets, so comeback claims and recommended upgrades now surface one top CTA while the highlighted list card yields duplicate actions.
+- Stabilized Playwright smoke execution for Phaser/WebGL by reducing worker concurrency, eliminating the flaky GPU/contention timeouts that appeared once the smoke suite grew.
+- Reworked win, fail, and reward-reveal overlays so the recommended next action now lives in a dedicated focus card instead of competing inline buttons, keeping monetization and follow-up beats clear without duplicating CTAs.
+- Extended smoke coverage to assert the reward-reveal focus-card pattern for chapter-chest and chapter-unlock follow-up flows.
+- Added a `?debug=1` browser debug harness for deterministic smoke driving of win/fail states, then extended smoke coverage to assert the new single-focus CTA layout on both end-of-level overlays.
+- Extended the debug-driven fail smoke suite to cover `gems_primary` and `piggy_primary` monetization branches, including the piggy-bank purchase pivot back into gem-based recovery on the same fail screen.

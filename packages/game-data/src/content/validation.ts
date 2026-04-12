@@ -1,4 +1,9 @@
-import type { ChapterDefinition, LevelDefinition, ObjectiveType } from "@bubble-kingdom/shared";
+import type {
+  ChapterDefinition,
+  LevelDefinition,
+  LiveEventDefinition,
+  ObjectiveType,
+} from "@bubble-kingdom/shared";
 
 import { collectLayoutColors, countLayoutKinds, parseLayoutToken } from "../levels/helpers";
 
@@ -111,6 +116,16 @@ export function validateChapters(
 
   for (const chapter of chapters) {
     const seenIndexes = new Set<number>();
+    const maxChapterStars = chapter.levels.length * 3;
+
+    if (chapter.chapterChestStarsRequired <= 0) {
+      errors.push(`Chapter ${chapter.id} must require positive stars for its chest.`);
+    }
+    if (chapter.chapterChestStarsRequired > maxChapterStars) {
+      errors.push(
+        `Chapter ${chapter.id} chest target ${chapter.chapterChestStarsRequired} exceeds max stars ${maxChapterStars}.`,
+      );
+    }
 
     for (const levelId of chapter.levels) {
       const level = levelsById.get(levelId);
@@ -138,6 +153,44 @@ export function validateChapters(
         );
       }
     });
+  }
+
+  return errors;
+}
+
+export function validateEvents(events: LiveEventDefinition[]): string[] {
+  const errors: string[] = [];
+  const seenEvents = new Set<string>();
+
+  for (const event of events) {
+    if (seenEvents.has(event.id)) {
+      errors.push(`Duplicate event id ${event.id}`);
+    }
+    seenEvents.add(event.id);
+
+    if (event.rewardTrack.length === 0) {
+      errors.push(`Event ${event.id} must contain at least one milestone.`);
+      continue;
+    }
+
+    const seenMilestones = new Set<string>();
+    let previousCost = 0;
+    for (const milestone of event.rewardTrack) {
+      if (seenMilestones.has(milestone.id)) {
+        errors.push(`Event ${event.id} has duplicate milestone id ${milestone.id}.`);
+      }
+      seenMilestones.add(milestone.id);
+
+      if (milestone.tokenCost <= 0) {
+        errors.push(`Event ${event.id} milestone ${milestone.id} must cost positive tokens.`);
+      }
+      if (milestone.tokenCost <= previousCost) {
+        errors.push(
+          `Event ${event.id} milestone ${milestone.id} must have a token cost greater than the previous milestone.`,
+        );
+      }
+      previousCost = milestone.tokenCost;
+    }
   }
 
   return errors;

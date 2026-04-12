@@ -5,6 +5,8 @@
 - GitHub repository was created but was empty at the start of execution.
 - No prior game code, assets, CI, or docs existed locally.
 - Platform requirements were reviewed against official Yandex Games documentation before scaffolding.
+- The working product spec was expanded on `2026-04-08` with explicit first-session, comeback, user-story, and regression-case requirements; the implementation plan now treats that spec as the main player-flow reference.
+- The current shell now also treats live-event visibility, restoration celebration, restoration-next-step guidance, chapter-reward follow-up routing, chapter-unlock reveal beats, post-reveal map spotlights, post-claim follow-up CTA planning, spotlight self-healing on map return, single-focus map hero arbitration, spotlight-aware digest de-duplication, spotlight-aware side-panel CTA suppression, spotlight-aware level/restore preview suppression, spotlight-aware event summary suppression, overlay-level recommendation highlighting, overlay-level quest/event/inbox/restoration focus CTAs, restoration affordability gating, daily-reward-to-restore routing, quest-claim-to-follow-up routing, honest post-claim daily-reward presentation, win/fail/reward-reveal focus-card CTA arbitration, transparent `Ad Light` vs `No Ads` shop messaging, a persistent shop ad-status card, a surfaced `No Ads` upgrade state after `Ad Light`, a post-purchase return-to-map beat for `No Ads`, and deterministic debug-assisted regression coverage for end-of-level states, fail-monetization variants, and ad-suppression rules as first-class UX requirements, so event/chapter/inbox pressure stays visible without extra digging and major beats hand the player to the next clear action.
 
 ## Product Assumptions
 
@@ -45,6 +47,7 @@
 - Restoration hub, quests, daily rewards, inbox, shop, leaderboards, and event skeleton.
 - Rewarded/interstitial/banner abstractions and purchase catalog.
 - Yandex adapter and build profiles for local, Yandex, VK-ready, and test targets.
+- First-session guidance, comeback rewards, current-goal UX, gated event-goal surfacing, pre-level briefing with starter boosters, live-event reward track UX, restoration and reward reveal beats, restoration-next-step guidance, chapter-reward follow-up routing into next-zone or event beats, one-time chapter-unlock reveals on map entry, persistent map spotlights after dismissed reveal beats, post-claim spotlight routing that skips stale daily prompts, quest-claim follow-up routing, map-spotlight self-healing on return to the map shell, single-focus map hero CTA arbitration, spotlight-aware digest de-duplication, spotlight-aware side-panel CTA suppression, spotlight-aware level/restore preview suppression, spotlight-aware event summary suppression, overlay-level recommended-target highlighting, overlay-level quest/event/inbox/restoration focus CTAs, win/fail/reward-reveal focus-card CTA arbitration, restoration affordability gating, daily-reward-to-restore routing, state-aware daily-reward modal copy for claimable vs already-collected states, explicit `Ad Light` vs `No Ads` shop comparison UX with upgrade signaling, a persistent ad-status explainer inside the shop shell, map-surface alert badges/chips, localization regression checks, and traceability from product spec to tests.
 
 ### M4. Ship Readiness
 

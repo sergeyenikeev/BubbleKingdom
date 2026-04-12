@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import { chapters } from "../../src/content/chapters";
-import { validateChapters, validateLevelData } from "../../src/content/validation";
+import { liveEvents } from "../../src/content/events";
+import { validateChapters, validateEvents, validateLevelData } from "../../src/content/validation";
 import { curatedLevels } from "../../src/levels/curated";
 import { levels } from "../../src/levels/generated";
 import type { LevelDefinition } from "../../../shared/src/index";
@@ -18,6 +19,7 @@ describe("game data validation", () => {
   it("validates the shipped level and chapter content without errors", () => {
     expect(validateLevelData(levels)).toEqual([]);
     expect(validateChapters(chapters, levels)).toEqual([]);
+    expect(validateEvents(liveEvents)).toEqual([]);
   });
 
   it("flags levels with objective targets that exceed board content", () => {

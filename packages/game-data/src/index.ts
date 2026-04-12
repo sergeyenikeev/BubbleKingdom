@@ -1,12 +1,14 @@
 import { chapters } from "./content/chapters";
 import { dailyRewards } from "./content/dailyRewards";
+import { liveEvents } from "./content/events";
 import { questDefinitions } from "./content/quests";
-import { validateChapters, validateLevelData } from "./content/validation";
+import { validateChapters, validateEvents, validateLevelData } from "./content/validation";
 import { levels } from "./levels/generated";
 import { shopCatalog } from "./shop/catalog";
 
 export * from "./content/chapters";
 export * from "./content/dailyRewards";
+export * from "./content/events";
 export * from "./content/quests";
 export * from "./content/validation";
 export * from "./levels/curated";
@@ -15,11 +17,12 @@ export * from "./levels/helpers";
 export * from "./shop/catalog";
 export * from "./shop/commerce";
 
-export const contentVersion = "2026.04.08-mvp.1";
+export const contentVersion = "2026.04.09-mvp.2";
 
 export const contentValidationErrors = [
   ...validateLevelData(levels),
   ...validateChapters(chapters, levels),
+  ...validateEvents(liveEvents),
 ];
 
 if (contentValidationErrors.length > 0) {
@@ -29,6 +32,7 @@ if (contentValidationErrors.length > 0) {
 export const liveContent = {
   chapters,
   dailyRewards,
+  events: liveEvents,
   quests: questDefinitions,
   levels,
   shopCatalog,

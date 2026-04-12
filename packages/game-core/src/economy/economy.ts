@@ -86,6 +86,16 @@ export function applyShopOffer(save: PlayerSave, offer: ShopOfferDefinition): Pl
     };
   }
 
+  if (offer.type === "ad_light") {
+    updated = {
+      ...updated,
+      economy: {
+        ...updated.economy,
+        adLightPurchased: true,
+      },
+    };
+  }
+
   if (offer.type === "piggy_bank") {
     updated = {
       ...updated,

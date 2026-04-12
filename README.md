@@ -66,6 +66,7 @@ Primary docs live under [docs](./docs):
 - `docs/MONETIZATION.md`
 - `docs/ANALYTICS.md`
 - `docs/TESTING.md`
+- `docs/PLAYER_FLOWS_AND_TEST_CASES.md`
 - `docs/YANDEX_MODERATION_CHECKLIST.md`
 - `docs/MANUAL_PLATFORM_STEPS.md`
 - `docs/PORTING_TO_VK.md`

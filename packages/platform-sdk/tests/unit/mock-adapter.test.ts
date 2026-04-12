@@ -64,7 +64,8 @@ describe("mock platform adapter", () => {
 
     expect(productIds).toContain("welcome_offer");
     expect(productIds).toContain("piggy_bank");
+    expect(productIds).toContain("ad_light");
     expect(productIds).toContain("season_pass");
-    expect(catalog).toHaveLength(10);
+    expect(catalog).toHaveLength(11);
   });
 });

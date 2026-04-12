@@ -133,6 +133,9 @@ select {
 .restoration-card,
 .quest-card,
 .offer-card,
+.goal-card,
+.coach-card,
+.objective-remaining,
 .piggy-panel,
 .list-card,
 .notice,
@@ -175,8 +178,11 @@ select {
 
 .hero-panel,
 .hero-grid,
+.goal-card,
 .settings-grid,
 .offer-grid,
+.prelevel-summary-grid,
+.prelevel-booster-grid,
 .restoration-grid,
 .level-track {
   display: grid;
@@ -184,6 +190,14 @@ select {
 }
 
 .hero-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.prelevel-summary-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.prelevel-booster-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
@@ -197,6 +211,85 @@ select {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+}
+
+.cta-row-support {
+  justify-content: flex-start;
+}
+
+.spotlight-helper {
+  color: var(--ink-soft);
+  font-weight: 700;
+}
+
+.level-preview-card {
+  display: grid;
+  gap: 10px;
+}
+
+.restoration-card.is-spotlight-target {
+  border-color: rgba(76, 191, 176, 0.28);
+  box-shadow: 0 14px 30px rgba(76, 191, 176, 0.14);
+}
+
+.goal-card,
+.coach-card,
+.objective-remaining,
+.inbox-card,
+.prelevel-modal {
+  gap: 10px;
+}
+
+.goal-card {
+  margin-top: 12px;
+}
+
+.notice-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.notice-chip {
+  background: rgba(23, 48, 66, 0.08);
+  border: 1px solid rgba(23, 48, 66, 0.08);
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-size: 0.82rem;
+  color: var(--ink);
+}
+
+.notice-chip.is-accent {
+  background: rgba(255, 141, 59, 0.16);
+  border-color: rgba(255, 141, 59, 0.24);
+}
+
+.notice-chip.is-strong {
+  background: rgba(76, 191, 176, 0.16);
+  border-color: rgba(76, 191, 176, 0.24);
+}
+
+.coach-card {
+  background: linear-gradient(180deg, rgba(255, 177, 80, 0.2), rgba(255, 255, 255, 0.82));
+  border: 1px solid rgba(255, 141, 59, 0.28);
+}
+
+.spotlight-card {
+  background:
+    radial-gradient(circle at top right, rgba(76, 191, 176, 0.16), transparent 32%),
+    linear-gradient(180deg, rgba(240, 255, 251, 0.94), rgba(255, 255, 255, 0.86));
+  border: 1px solid rgba(76, 191, 176, 0.22);
+}
+
+.coach-card-compact {
+  padding: 12px 14px;
+}
+
+.objective-remaining {
+  background: rgba(255, 255, 255, 0.75);
+  border-radius: 18px;
+  padding: 12px 14px;
+  border: 1px solid rgba(23, 48, 66, 0.08);
 }
 
 .cta-row-stacked {
@@ -271,6 +364,10 @@ select {
   background: rgba(76, 191, 176, 0.22);
 }
 
+.metric-card-wide {
+  grid-column: span 2;
+}
+
 .bottom-nav {
   position: absolute;
   left: var(--safe-left);
@@ -293,6 +390,24 @@ select {
   font-weight: 700;
 }
 
+.nav-btn {
+  position: relative;
+}
+
+.nav-badge {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  min-width: 20px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #ffb150, #ff8d3b);
+  color: white;
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
 .overlay-modal {
   position: absolute;
   inset: 0;
@@ -311,6 +426,33 @@ select {
 .fail-modal {
   display: grid;
   gap: 14px;
+}
+
+.reward-reveal-modal,
+.reward-reveal-summary {
+  display: grid;
+  gap: 12px;
+}
+
+.reward-reveal-progress,
+.restoration-progress-card,
+.reward-highlight-card {
+  background:
+    radial-gradient(circle at top right, rgba(76, 191, 176, 0.14), transparent 32%),
+    linear-gradient(180deg, rgba(255, 248, 235, 0.96), rgba(255, 255, 255, 0.86));
+}
+
+.overlay-focus-card {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.reward-reveal-summary {
+  background: linear-gradient(180deg, rgba(255, 238, 217, 0.9), rgba(255, 255, 255, 0.84));
+  border: 1px solid rgba(255, 141, 59, 0.22);
+  border-radius: 20px;
+  padding: 16px;
 }
 
 .fail-copy {
@@ -366,10 +508,148 @@ select {
   overflow: hidden;
 }
 
+.shop-status-card {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 14px;
+  background: linear-gradient(180deg, rgba(255, 246, 232, 0.96), rgba(255, 255, 255, 0.9));
+  border: 1px solid rgba(220, 157, 110, 0.28);
+}
+
+.shop-status-card.is-upgraded {
+  border-color: rgba(255, 141, 59, 0.36);
+  box-shadow: 0 18px 44px rgba(255, 141, 59, 0.16);
+}
+
+.shop-status-card.is-complete {
+  border-color: rgba(82, 152, 116, 0.34);
+  box-shadow: 0 18px 44px rgba(82, 152, 116, 0.14);
+}
+
+.offer-benefit-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(108px, 1fr));
+  gap: 8px;
+}
+
+.offer-benefit-pill {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(255, 247, 239, 0.9);
+  border: 1px solid rgba(220, 157, 110, 0.2);
+}
+
+.offer-benefit-pill span {
+  font-size: 0.72rem;
+  color: rgba(108, 76, 47, 0.82);
+}
+
+.offer-benefit-pill strong {
+  font-size: 0.9rem;
+}
+
+.offer-benefit-pill.is-accent {
+  background: linear-gradient(180deg, rgba(255, 236, 212, 0.94), rgba(255, 247, 239, 0.94));
+  border-color: rgba(255, 141, 59, 0.28);
+}
+
+.offer-upgrade-hint {
+  color: rgba(138, 84, 31, 0.9);
+}
+
+.daily-rewards-screen,
+.daily-reward-card {
+  display: grid;
+  gap: 10px;
+}
+
+.daily-summary-card {
+  background:
+    radial-gradient(circle at top right, rgba(255, 255, 255, 0.18), transparent 28%),
+    linear-gradient(180deg, rgba(255, 141, 59, 0.16), rgba(255, 255, 255, 0.82));
+}
+
+.daily-summary-copy,
+.reward-detail {
+  line-height: 1.5;
+}
+
+.daily-reward-card.is-claimed-today {
+  border-color: rgba(76, 191, 176, 0.28);
+  box-shadow: 0 14px 32px rgba(76, 191, 176, 0.12);
+}
+
+.daily-reward-card.is-up-next {
+  border-color: rgba(255, 141, 59, 0.35);
+}
+
+.prelevel-modal {
+  display: grid;
+}
+
+.prelevel-rewards {
+  margin: 4px 0;
+  line-height: 1.55;
+}
+
+.prelevel-booster-card {
+  display: grid;
+  gap: 10px;
+  text-align: left;
+  min-height: 126px;
+  border: 1px solid rgba(23, 48, 66, 0.1);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.78);
+  padding: 14px;
+  cursor: pointer;
+  transition:
+    transform 120ms ease,
+    border-color 120ms ease,
+    box-shadow 120ms ease,
+    opacity 120ms ease;
+}
+
+.prelevel-booster-card:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.prelevel-booster-card.is-selected {
+  border-color: rgba(255, 141, 59, 0.42);
+  box-shadow: 0 16px 28px rgba(255, 141, 59, 0.12);
+  background: linear-gradient(180deg, rgba(255, 238, 217, 0.95), rgba(255, 255, 255, 0.82));
+}
+
 .offer-card.is-highlighted,
-.piggy-panel.is-spotlight {
+.piggy-panel.is-spotlight,
+.chapter-chest-card.is-highlighted,
+.event-summary-panel.is-highlighted,
+.event-milestone-card.is-highlighted,
+.quest-card.is-highlighted,
+.inbox-card.is-highlighted,
+.restoration-card.is-highlighted {
   border-color: rgba(255, 141, 59, 0.35);
   box-shadow: 0 20px 48px rgba(255, 141, 59, 0.18);
+}
+
+.chapter-chest-card,
+.event-summary-panel,
+.event-milestone-card {
+  display: grid;
+  gap: 10px;
+}
+
+.event-summary-panel {
+  background:
+    radial-gradient(circle at top right, rgba(255, 255, 255, 0.18), transparent 28%),
+    linear-gradient(180deg, rgba(76, 191, 176, 0.16), rgba(255, 255, 255, 0.82));
+}
+
+.event-milestone-card .tag,
+.chapter-chest-card .tag {
+  backdrop-filter: none;
 }
 
 .progress-ribbon {
@@ -405,6 +685,11 @@ select {
   }
 
   .cta-row-stacked {
+    grid-template-columns: 1fr;
+  }
+
+  .prelevel-summary-grid,
+  .prelevel-booster-grid {
     grid-template-columns: 1fr;
   }
 

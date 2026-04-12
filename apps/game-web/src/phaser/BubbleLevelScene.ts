@@ -131,6 +131,21 @@ export class BubbleLevelScene extends Phaser.Scene {
         this.aimGraphics.lineTo(point.x, point.y);
       }
       this.aimGraphics.strokePath();
+
+       if (this.state.activeLevel.precisionAimActive) {
+        const landingPoint = path.at(-1);
+        if (landingPoint) {
+          this.aimGraphics.lineStyle(3, 0xf7d884, 0.9);
+          this.aimGraphics.strokeCircle(landingPoint.x, landingPoint.y, 18);
+          this.aimGraphics.fillStyle(0xf7d884, 0.22);
+          this.aimGraphics.fillCircle(landingPoint.x, landingPoint.y, 18);
+        }
+
+        this.aimGraphics.fillStyle(0xffffff, 0.7);
+        for (const point of path.slice(0, -1)) {
+          this.aimGraphics.fillCircle(point.x, point.y, 5);
+        }
+      }
     }
   }
 }

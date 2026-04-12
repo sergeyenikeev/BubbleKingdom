@@ -83,6 +83,14 @@ const mockProducts: PlatformProduct[] = [
     priceCurrencyCode: "RUB",
   },
   {
+    id: "ad_light",
+    title: "Ad Light",
+    description: "Remove sticky banners while keeping optional rewarded help.",
+    price: "99 RUB",
+    priceValue: "99",
+    priceCurrencyCode: "RUB",
+  },
+  {
     id: "season_pass",
     title: "Season Pass",
     description: "Unlock a premium seasonal reward track.",

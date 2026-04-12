@@ -44,12 +44,14 @@ describe("save migrations and feature flags", () => {
         lastComebackAt: null,
       },
       quests: {},
+      events: {},
       inbox: [],
     });
 
-    expect(migrated.schemaVersion).toBe(3);
+    expect(migrated.schemaVersion).toBe(4);
     expect(migrated.economy.noAdsPurchased).toBe(false);
     expect(migrated.tutorial.currentStep).toBe("aim");
+    expect(migrated.events).toEqual({});
   });
 
   it("assigns experiment variants deterministically", () => {
@@ -62,6 +64,7 @@ describe("save migrations and feature flags", () => {
 
   it("falls back to english localization keys when needed", () => {
     expect(translate("ru", "ui.title")).toBe("Bubble Kingdom");
+    expect(translate("ru", "quest.daily.complete3.title")).toBe("Пройти 3 уровня");
     expect(translate("en", "missing.key")).toBe("missing.key");
   });
 });

@@ -11,6 +11,9 @@ export function migrateSave(raw: unknown): PlayerSave {
   if ((migrated.schemaVersion ?? 0) < 3) {
     migrated = migrateV2ToV3(migrated);
   }
+  if ((migrated.schemaVersion ?? 0) < 4) {
+    migrated = migrateV3ToV4(migrated);
+  }
 
   return playerSaveSchema.parse({
     ...migrated,
@@ -42,5 +45,13 @@ function migrateV2ToV3(raw: Partial<PlayerSave>) {
       seenSteps: [],
     },
     experiments: raw.experiments ?? {},
+  };
+}
+
+function migrateV3ToV4(raw: Partial<PlayerSave>) {
+  return {
+    ...raw,
+    schemaVersion: 4,
+    events: raw.events ?? {},
   };
 }

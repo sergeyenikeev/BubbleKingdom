@@ -76,7 +76,9 @@ describe("save service", () => {
       logger,
     });
 
-    expect(loaded.progression.currentLevelId).toBe(5);
-    expect(loaded.progression.lastDailyRewardAt).toBe("2026-04-08T00:00:00.000Z");
+    expect(loaded.save.progression.currentLevelId).toBe(5);
+    expect(loaded.save.progression.lastDailyRewardAt).toBe("2026-04-08T00:00:00.000Z");
+    expect(loaded.source).toBe("local");
+    expect(loaded.recovered).toBe(false);
   });
 });

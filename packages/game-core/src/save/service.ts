@@ -3,17 +3,26 @@ import type { RemoteConfig } from "@bubble-kingdom/config";
 import type { PlatformAdapter } from "@bubble-kingdom/platform-sdk";
 
 import { migrateSave } from "./migrations";
-import { createDefaultSave, type PlayerSave } from "./schema";
+import { createDefaultSave, SAVE_SCHEMA_VERSION, type PlayerSave } from "./schema";
 
 const SAVE_KEY = "save";
 const CLOUD_SAVE_KEY = "cloud-save";
+
+export interface LoadPlayerSaveResult {
+  save: PlayerSave;
+  source: "default" | "local" | "cloud";
+  previousSessionAt: string | null;
+  recovered: boolean;
+  migrationApplied: boolean;
+  previousSchemaVersion: number | null;
+}
 
 export async function loadPlayerSave(input: {
   platform: PlatformAdapter;
   remoteConfig: RemoteConfig;
   locale: "ru" | "en";
   logger: Logger;
-}): Promise<PlayerSave> {
+}): Promise<LoadPlayerSaveResult> {
   const nowIso = new Date(await input.platform.serverTime.now()).toISOString();
   const identity = await input.platform.auth.getIdentity();
   const fallbackInput: Parameters<typeof createDefaultSave>[0] = {
@@ -33,18 +42,39 @@ export async function loadPlayerSave(input: {
     : null;
 
   const raw = rawCloud ?? rawLocal;
+  const source = rawCloud ? "cloud" : rawLocal ? "local" : "default";
   if (!raw) {
     input.logger.info("SAVE", "No save found, creating default profile");
-    return fallback;
+    return {
+      save: fallback,
+      source,
+      previousSessionAt: null,
+      recovered: false,
+      migrationApplied: false,
+      previousSchemaVersion: null,
+    };
   }
 
   const parsed = safeJsonParse<unknown>(raw);
   if (!parsed) {
     input.logger.warn("SAVE", "Save was corrupted, fallback applied");
-    return fallback;
+    return {
+      save: fallback,
+      source: "default",
+      previousSessionAt: null,
+      recovered: true,
+      migrationApplied: false,
+      previousSchemaVersion: null,
+    };
   }
 
   try {
+    const candidate = parsed as Partial<PlayerSave> & {
+      schemaVersion?: number;
+      profile?: { lastSessionAt?: string };
+    };
+    const previousSchemaVersion = candidate.schemaVersion ?? 1;
+    const previousSessionAt = candidate.profile?.lastSessionAt ?? null;
     const migrated = migrateSave(parsed);
     const profile: PlayerSave["profile"] = {
       ...migrated.profile,
@@ -56,14 +86,28 @@ export async function loadPlayerSave(input: {
       profile.userId = resolvedUserId;
     }
     return {
-      ...migrated,
-      profile,
+      save: {
+        ...migrated,
+        profile,
+      },
+      source,
+      previousSessionAt,
+      recovered: false,
+      migrationApplied: previousSchemaVersion < SAVE_SCHEMA_VERSION,
+      previousSchemaVersion,
     };
   } catch (error) {
     input.logger.error("SAVE", "Save migration failed, fallback applied", {
       error: error instanceof Error ? error.message : String(error),
     });
-    return fallback;
+    return {
+      save: fallback,
+      source: "default",
+      previousSessionAt: null,
+      recovered: true,
+      migrationApplied: false,
+      previousSchemaVersion: null,
+    };
   }
 }
 

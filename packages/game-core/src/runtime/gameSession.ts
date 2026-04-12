@@ -2,6 +2,7 @@ import {
   levels,
   chapters,
   dailyRewards,
+  liveEvents,
   questDefinitions,
   shopCatalog,
 } from "@bubble-kingdom/game-data";
@@ -32,6 +33,12 @@ import { performShot, undoLastShot } from "../board/resolution";
 import { predictShotTrace } from "../board/shot";
 import type { BoardState, ResolutionSummary, ShotTrace } from "../board/types";
 import {
+  applyPreLevelLoadout,
+  preLevelBoosterIds,
+  togglePreLevelBoosterSelection,
+  type PreLevelBoosterId,
+} from "../boosters/preLevel";
+import {
   applyRewardGrant,
   applyShopOffer,
   calculateExtraMovesGemCost,
@@ -43,7 +50,25 @@ import { decideFailOffer } from "../economy/offerDecisioning";
 import { assignExperimentVariants } from "../features/featureFlags";
 import { translate } from "../localization/messages";
 import { claimDailyReward, getDailyRewardAvailability } from "../progression/dailyRewards";
-import { restoreNode, totalStars } from "../progression/restoration";
+import {
+  claimEventMilestone,
+  getEventProgressSummary,
+} from "../progression/events";
+import {
+  canClaimChapterChest,
+  chapterStarsEarned,
+  claimChapterChest,
+  restoreNode,
+  totalStars,
+} from "../progression/restoration";
+import {
+  enqueueComebackReward,
+  getChapterUnlockSeenKey,
+  planChapterUnlockReveal,
+  planChapterFollowUp,
+  planComebackReward,
+  planSessionGoalSpotlight,
+} from "../progression/sessionGuidance";
 import {
   applyQuestProgress,
   claimQuestReward,
@@ -51,11 +76,12 @@ import {
 } from "../quests/quests";
 import { createDefaultSave, type PlayerSave } from "../save/schema";
 import { loadPlayerSave, writePlayerSave } from "../save/service";
-import { getNextTutorialStep } from "../tutorial/tutorial";
+import { getNextTutorialStep, markTutorialStepSeen } from "../tutorial/tutorial";
 
 export type ScreenId =
   | "boot"
   | "map"
+  | "preLevel"
   | "level"
   | "win"
   | "fail"
@@ -73,15 +99,54 @@ export interface ActiveLevelSession {
   board: BoardState;
   preview: ShotTrace | null;
   lastSummary: ResolutionSummary | null;
+  precisionAimActive: boolean;
+  starterBoostersUsed: PreLevelBoosterId[];
   continueUsed: boolean;
   continueOffersUsed: number;
   winReward: RewardGrant | null;
   winBonusClaimed: boolean;
 }
 
+export interface LevelPreviewState {
+  levelId: number;
+  selectedBoosters: PreLevelBoosterId[];
+}
+
 export interface DecoratedShopOffer extends ShopOfferDefinition {
   platformPriceLabel: string;
   helperText?: string;
+}
+
+export interface RewardRevealState {
+  tagKey: string;
+  titleKey: string;
+  bodyKey: string;
+  rewards?: RewardGrant;
+  featureHighlight?: {
+    tagKey: string;
+    titleKey: string;
+    bodyKey: string;
+  };
+  chapterId?: string;
+  restorationNodeId?: string;
+  primaryAction?: {
+    action:
+      | "open-screen"
+      | "start-current-level"
+      | "restore-node"
+      | "claim-event-reward"
+      | "claim-chapter-chest"
+      | "claim-quest";
+    id?: string;
+    labelKey: string;
+  };
+}
+
+export interface MapSpotlightState {
+  tagKey: string;
+  titleKey: string;
+  bodyKey: string;
+  action: NonNullable<RewardRevealState["primaryAction"]>;
 }
 
 export interface GameSessionState {
@@ -92,6 +157,7 @@ export interface GameSessionState {
   buildProfile: BuildProfile;
   save: PlayerSave;
   activeLevel: ActiveLevelSession | null;
+  levelPreview: LevelPreviewState | null;
   tutorialStep: string | null;
   lastError: string | null;
   notifications: string[];
@@ -100,6 +166,8 @@ export interface GameSessionState {
   shopOffers: DecoratedShopOffer[];
   platformCatalog: PlatformProduct[];
   eventId: string;
+  rewardReveal: RewardRevealState | null;
+  mapSpotlight: MapSpotlightState | null;
 }
 
 type GameSessionEvents = {
@@ -111,6 +179,10 @@ export interface GameSession {
   subscribe(listener: (state: GameSessionState) => void): () => void;
   boot(): Promise<void>;
   openScreen(screen: ScreenId): Promise<void>;
+  openLevelPreview(levelId: number): Promise<void>;
+  closeLevelPreview(): Promise<void>;
+  confirmLevelStart(): Promise<void>;
+  togglePreLevelBooster(boosterId: PreLevelBoosterId): void;
   startLevel(levelId: number): Promise<void>;
   previewShot(angleRadians: number): void;
   fireShot(angleRadians: number): Promise<void>;
@@ -123,7 +195,10 @@ export interface GameSession {
   claimQuest(questId: string): Promise<void>;
   purchaseOffer(offerId: string): Promise<void>;
   restoreArea(nodeId: string): Promise<void>;
+  claimChapterChest(chapterId: string): Promise<void>;
+  claimEventReward(milestoneId: string): Promise<void>;
   claimInboxItem(itemId: string): Promise<void>;
+  dismissRewardReveal(): Promise<void>;
   requestAuth(reason: string): Promise<void>;
   setLanguage(language: LanguageCode): Promise<void>;
   submitLeaderboard(): Promise<void>;
@@ -154,6 +229,7 @@ export function createGameSession(input: {
       remoteConfig: defaultRemoteConfig,
     }),
     activeLevel: null,
+    levelPreview: null,
     tutorialStep: null,
     lastError: null,
     notifications: [],
@@ -162,6 +238,8 @@ export function createGameSession(input: {
     shopOffers: [],
     platformCatalog: [],
     eventId: defaultRemoteConfig.liveops.currentEventId,
+    rewardReveal: null,
+    mapSpotlight: null,
   };
 
   const updateState = (patch: Partial<GameSessionState>) => {
@@ -190,6 +268,67 @@ export function createGameSession(input: {
     });
   };
 
+  const showRewardReveal = (reveal: RewardRevealState) => {
+    updateState({
+      rewardReveal: reveal,
+      mapSpotlight: null,
+    });
+  };
+
+  const clearMapSpotlight = () => {
+    if (!state.mapSpotlight) {
+      return;
+    }
+
+    updateState({
+      mapSpotlight: null,
+    });
+  };
+
+  const promoteRewardRevealToMapSpotlight = (reveal: RewardRevealState) => {
+    if (!reveal.featureHighlight || !reveal.primaryAction) {
+      return;
+    }
+
+    updateState({
+      mapSpotlight: {
+        ...reveal.featureHighlight,
+        action: reveal.primaryAction,
+      },
+    });
+  };
+
+  const canAllowEventGoals = (save: PlayerSave = state.save) =>
+    save.tutorial.completed || save.progression.completedLevels.length >= 2;
+
+  const setMapSpotlightFromSave = (
+    save: PlayerSave,
+    options?: { clearIfNone?: boolean; ignoreDailyReward?: boolean },
+  ) => {
+    const spotlight = planSessionGoalSpotlight({
+      save,
+      chapters,
+      quests: questDefinitions,
+      dailyRewardAvailable: state.dailyRewardAvailable,
+      event: getActiveEvent(),
+      allowEventGoals: canAllowEventGoals(save),
+      ...(options?.ignoreDailyReward ? { ignoreDailyReward: true } : {}),
+    });
+
+    if (spotlight) {
+      updateState({
+        mapSpotlight: spotlight,
+      });
+      return;
+    }
+
+    if (options?.clearIfNone) {
+      updateState({
+        mapSpotlight: null,
+      });
+    }
+  };
+
   const decorateShopOffers = (
     save: PlayerSave,
     platformCatalog: PlatformProduct[],
@@ -199,6 +338,12 @@ export function createGameSession(input: {
 
     return shopCatalog.flatMap((offer) => {
       if (offer.type === "no_ads" && save.economy.noAdsPurchased) {
+        return [];
+      }
+      if (
+        offer.type === "ad_light" &&
+        (save.economy.adLightPurchased || save.economy.noAdsPurchased)
+      ) {
         return [];
       }
       if (
@@ -231,7 +376,11 @@ export function createGameSession(input: {
           ("platformPriceId" in offer.price
             ? catalogById.get(offer.price.platformPriceId)?.price
             : undefined) ??
-          (offer.type === "no_ads" ? "249 RUB" : "149 RUB"),
+          (offer.type === "no_ads"
+            ? "249 RUB"
+            : offer.type === "ad_light"
+              ? "99 RUB"
+              : "149 RUB"),
       };
       if (badgeKey) {
         decorated.badgeKey = badgeKey;
@@ -274,10 +423,48 @@ export function createGameSession(input: {
     });
   };
 
-  const updateTutorialStep = () => {
+  const updateTutorialStep = (save: PlayerSave = state.save) => {
     updateState({
-      tutorialStep: getNextTutorialStep(state.save, state.remoteConfig),
+      tutorialStep: getNextTutorialStep(save, state.remoteConfig),
     });
+  };
+
+  const markTutorialStep = (save: PlayerSave, step: string) => {
+    if (save.tutorial.seenSteps.includes(step)) {
+      return save;
+    }
+
+    return markTutorialStepSeen(save, step);
+  };
+
+  const markSeenFlag = (save: PlayerSave, seenKey: string): PlayerSave => {
+    if (save.tutorial.seenSteps.includes(seenKey)) {
+      return save;
+    }
+
+    return {
+      ...save,
+      tutorial: {
+        ...save.tutorial,
+        seenSteps: [...save.tutorial.seenSteps, seenKey],
+      },
+    };
+  };
+
+  const getActiveEvent = (eventId: string = state.eventId) =>
+    liveEvents.find((event) => event.id === eventId) ?? liveEvents[0] ?? null;
+
+  const notifyClaimableEventMilestone = (before: PlayerSave, after: PlayerSave) => {
+    const activeEvent = getActiveEvent();
+    if (!activeEvent) {
+      return;
+    }
+
+    const beforeClaimable = getEventProgressSummary(before, activeEvent).claimableMilestones.length;
+    const afterSummary = getEventProgressSummary(after, activeEvent);
+    if (afterSummary.claimableMilestones.length > beforeClaimable) {
+      addNotification(translate(state.locale, "event.rewardReady"));
+    }
   };
 
   const trackCurrencyDelta = async (
@@ -313,9 +500,70 @@ export function createGameSession(input: {
     }
   };
 
+  const maybeShowChapterUnlockRevealOnMap = async () => {
+    if (state.currentScreen !== "map" || state.rewardReveal) {
+      return;
+    }
+
+    const unlockPlan = planChapterUnlockReveal({
+      save: state.save,
+      chapters,
+    });
+    if (!unlockPlan) {
+      return;
+    }
+
+    const nextSave = markSeenFlag(state.save, unlockPlan.seenKey);
+    const firstLandmark = unlockPlan.chapter.restorationNodes[0] ?? null;
+    const rewardReveal: RewardRevealState = {
+      tagKey: "reward.reveal.chapterUnlockedTag",
+      titleKey: unlockPlan.chapter.titleKey,
+      bodyKey: unlockPlan.chapter.descriptionKey,
+      primaryAction: {
+        action: "start-current-level",
+        labelKey: "reward.reveal.startChapter",
+      },
+    };
+    if (firstLandmark) {
+      rewardReveal.featureHighlight = {
+        tagKey: "reward.reveal.firstLandmarkTag",
+        titleKey: firstLandmark.titleKey,
+        bodyKey: firstLandmark.descriptionKey,
+      };
+    }
+    updateState({
+      save: nextSave,
+      rewardReveal,
+    });
+    addNotification(translate(state.locale, "reward.reveal.chapterUnlockedTag"));
+    await persist();
+  };
+
+  const restoreMapSpotlightIfNeeded = (
+    options?: { clearIfNone?: boolean; ignoreDailyReward?: boolean },
+  ) => {
+    if (state.currentScreen !== "map" || state.rewardReveal || state.mapSpotlight) {
+      return;
+    }
+
+    setMapSpotlightFromSave(state.save, {
+      clearIfNone: true,
+      ...(options?.ignoreDailyReward ? { ignoreDailyReward: true } : {}),
+    });
+  };
+
   const openScreenInternal = async (screen: ScreenId) => {
     const previousScreen = state.currentScreen;
-    updateState({ currentScreen: screen });
+    if (
+      state.mapSpotlight?.action.action === "open-screen" &&
+      state.mapSpotlight.action.id === screen
+    ) {
+      clearMapSpotlight();
+    }
+    updateState({
+      currentScreen: screen,
+      levelPreview: screen === "preLevel" ? state.levelPreview : null,
+    });
     const showBanner =
       screen !== "level" &&
       screen !== "win" &&
@@ -330,6 +578,12 @@ export function createGameSession(input: {
     }
     await input.platform.ads.setStickyBannerVisible(showBanner);
     if (screen === "shop") {
+      const updated = markTutorialStep(state.save, "shop");
+      if (updated !== state.save) {
+        updateState({ save: updated });
+        updateTutorialStep(updated);
+        await persist();
+      }
       await input.platform.analytics.track("shop_open");
     }
     if (screen === "leaderboards") {
@@ -340,31 +594,90 @@ export function createGameSession(input: {
       updateState({ leaderboard });
       await input.platform.analytics.track("leaderboard_open");
     }
+    if (screen === "event") {
+      const activeEvent = getActiveEvent();
+      if (activeEvent) {
+        const nextSave = {
+          ...state.save,
+          events: {
+            ...state.save.events,
+            [activeEvent.id]: {
+              claimedMilestones: state.save.events[activeEvent.id]?.claimedMilestones ?? [],
+              lastViewedAt: new Date().toISOString(),
+            },
+          },
+        };
+        updateState({ save: nextSave });
+        await persist();
+      }
+    }
+
+    if (screen === "map") {
+      await maybeShowChapterUnlockRevealOnMap();
+      restoreMapSpotlightIfNeeded();
+    }
   };
 
-  const startLevelInternal = async (levelId: number) => {
+  const startLevelInternal = async (
+    levelId: number,
+    starterBoosters: PreLevelBoosterId[] = [],
+  ) => {
     const level = levels.find((item) => item.id === levelId);
     if (!level) {
       throw new Error(`Unknown level ${levelId}`);
     }
 
-    const board = createBoardState(level);
+    let board = createBoardState(level);
+    let save = state.save;
+    let precisionAimActive = false;
+    let starterBoostersUsed: PreLevelBoosterId[] = [];
+
+    if (starterBoosters.length > 0) {
+      const resolution = applyPreLevelLoadout(state.save, board, starterBoosters);
+      board = resolution.board;
+      save = resolution.save;
+      precisionAimActive = resolution.precisionAimActive;
+      starterBoostersUsed = resolution.appliedBoosters;
+    }
+
+    const saveChanged = save !== state.save;
+
     updateState({
       currentScreen: "level",
+      save,
       activeLevel: {
         level,
         board,
         preview: null,
         lastSummary: null,
+        precisionAimActive,
+        starterBoostersUsed,
         continueUsed: false,
         continueOffersUsed: 0,
         winReward: null,
         winBonusClaimed: false,
       },
+      levelPreview: null,
     });
+    refreshShopOffers(save);
+    updateTutorialStep(save);
     await input.platform.ads.setStickyBannerVisible(false);
     await input.platform.lifecycle.startGameplay();
-    await input.platform.analytics.track("level_start", { levelId });
+    for (const boosterId of starterBoostersUsed) {
+      await input.platform.analytics.track("booster_used", {
+        boosterId,
+        levelId,
+        phase: "pre_level",
+      });
+    }
+    await input.platform.analytics.track("level_start", {
+      levelId,
+      starterBoosters: starterBoostersUsed,
+      precisionAimActive,
+    });
+    if (saveChanged) {
+      await persist();
+    }
   };
 
   return {
@@ -396,14 +709,27 @@ export function createGameSession(input: {
         defaultRemoteConfig,
         await input.platform.remoteConfig.getRemoteConfig(),
       );
-      const loadedSave = await loadPlayerSave({
+      const loadedSaveResult = await loadPlayerSave({
         platform: input.platform,
         remoteConfig,
         locale,
         logger: input.logger,
       });
+      await input.platform.analytics.track("save_load", {
+        source: loadedSaveResult.source,
+        recovered: loadedSaveResult.recovered,
+        migrationApplied: loadedSaveResult.migrationApplied,
+      });
+      if (loadedSaveResult.migrationApplied) {
+        await input.platform.analytics.track("save_migration", {
+          source: loadedSaveResult.source,
+          fromVersion: loadedSaveResult.previousSchemaVersion,
+          toVersion: loadedSaveResult.save.schemaVersion,
+        });
+      }
+
       const saveWithQuests = initializeQuestProgress(
-        loadedSave,
+        loadedSaveResult.save,
         questDefinitions,
         new Date().toISOString(),
       );
@@ -411,16 +737,29 @@ export function createGameSession(input: {
         input.platform.session.anonymousId,
         remoteConfig,
       );
-      const saveWithExperiments = {
+      let saveWithExperiments = {
         ...saveWithQuests,
         experiments,
       };
+      const comebackPlan = planComebackReward({
+        save: saveWithExperiments,
+        previousSessionAt: loadedSaveResult.previousSessionAt,
+        nowIso: saveWithExperiments.profile.lastSessionAt,
+        remoteConfig,
+      });
+      if (comebackPlan.available) {
+        saveWithExperiments = enqueueComebackReward(
+          saveWithExperiments,
+          comebackPlan,
+          saveWithExperiments.profile.lastSessionAt,
+        );
+      }
       const shopOffers = await resolveShopOffers(saveWithExperiments, remoteConfig);
 
       updateState({
         bootStatus: "ready",
         currentScreen: "map",
-        locale: saveWithQuests.settings.language ?? locale,
+        locale: saveWithExperiments.settings.language ?? locale,
         remoteConfig,
         save: saveWithExperiments,
         shopOffers,
@@ -432,16 +771,79 @@ export function createGameSession(input: {
         await input.platform.analytics.track("ab_variant_assigned", { key, value });
       }
 
+      if (comebackPlan.available) {
+        addNotification(translate(state.locale, "comeback.notice"));
+      }
+
       await refreshDailyRewardState();
-      updateTutorialStep();
+      updateTutorialStep(saveWithExperiments);
       await input.platform.lifecycle.markLoadingReady();
       if (state.dailyRewardAvailable) {
         updateState({ currentScreen: "dailyRewards" });
+      } else {
+        await maybeShowChapterUnlockRevealOnMap();
+        restoreMapSpotlightIfNeeded();
       }
       await persist();
     },
     async openScreen(screen) {
       await openScreenInternal(screen);
+    },
+    async openLevelPreview(levelId) {
+      const level = levels.find((item) => item.id === levelId);
+      if (!level) {
+        throw new Error(`Unknown level ${levelId}`);
+      }
+
+      if (
+        state.mapSpotlight?.action.action === "start-current-level" &&
+        levelId === state.save.progression.currentLevelId
+      ) {
+        clearMapSpotlight();
+      }
+
+      updateState({
+        currentScreen: "preLevel",
+        levelPreview: {
+          levelId,
+          selectedBoosters: [],
+        },
+      });
+      await input.platform.ads.setStickyBannerVisible(
+        state.remoteConfig.ads.allowBannerOnMap && !state.save.economy.adLightPurchased,
+      );
+    },
+    async closeLevelPreview() {
+      updateState({
+        levelPreview: null,
+      });
+      await openScreenInternal("map");
+    },
+    async confirmLevelStart() {
+      if (!state.levelPreview) {
+        return;
+      }
+
+      await startLevelInternal(
+        state.levelPreview.levelId,
+        state.levelPreview.selectedBoosters,
+      );
+    },
+    togglePreLevelBooster(boosterId) {
+      if (!state.levelPreview || !preLevelBoosterIds.includes(boosterId)) {
+        return;
+      }
+
+      updateState({
+        levelPreview: {
+          ...state.levelPreview,
+          selectedBoosters: togglePreLevelBoosterSelection(
+            state.levelPreview.selectedBoosters,
+            boosterId,
+            state.save.boosters,
+          ),
+        },
+      });
     },
     async startLevel(levelId) {
       await startLevelInternal(levelId);
@@ -463,32 +865,31 @@ export function createGameSession(input: {
       const summary = performShot(levelSession.board, levelSession.level, angleRadians);
       levelSession.lastSummary = summary;
       levelSession.preview = null;
+      let nextSave = markTutorialStep(state.save, "aim");
+      let saveChanged = nextSave !== state.save;
 
       if (summary.popped.length > 0 || summary.dropped.length > 0) {
+        nextSave = markTutorialStep(nextSave, "match");
         const goldGain = Math.max(0, Math.floor(summary.scoreGained / 10));
-        updateState({
-          save: {
-            ...applyQuestProgress(
-              {
-                ...state.save,
-                economy: {
-                  ...state.save.economy,
-                  piggyBankGold: calculatePiggyBankProgress(
-                    state.save,
-                    goldGain,
-                    state.remoteConfig,
-                  ),
-                },
-              },
-              questDefinitions,
-              {
-                stars_earned: summary.winAchieved ? levelSession.board.starsEarned : 0,
-              },
-              new Date().toISOString(),
-            ),
+        nextSave = applyQuestProgress(
+          {
+            ...nextSave,
+            economy: {
+              ...nextSave.economy,
+              piggyBankGold: calculatePiggyBankProgress(
+                nextSave,
+                goldGain,
+                state.remoteConfig,
+              ),
+            },
           },
-        });
-        refreshShopOffers(state.save);
+          questDefinitions,
+          {
+            stars_earned: summary.winAchieved ? levelSession.board.starsEarned : 0,
+          },
+          new Date().toISOString(),
+        );
+        saveChanged = true;
       }
 
       await input.platform.analytics.track("level_objective_progress", {
@@ -505,9 +906,9 @@ export function createGameSession(input: {
           gold: levelSession.level.rewards.gold + levelSession.board.starsEarned * 35,
         };
 
-        const completedLevels = new Set(state.save.progression.completedLevels);
+        const completedLevels = new Set(nextSave.progression.completedLevels);
         completedLevels.add(levelSession.level.id);
-        const rewardedSave = applyRewardGrant(state.save, levelReward);
+        const rewardedSave = applyRewardGrant(nextSave, levelReward);
         const progressedSave = applyQuestProgress(
           {
             ...rewardedSave,
@@ -546,10 +947,20 @@ export function createGameSession(input: {
           },
         });
         refreshShopOffers(progressedSave);
+        updateTutorialStep(progressedSave);
 
         addNotification(
           `${translate(state.locale, "level.win")} +${levelReward.gold ?? 0} ${translate(state.locale, "currency.gold")}`,
         );
+        const justUnlockedChest = chapters.find(
+          (chapter) =>
+            chapter.levels.includes(levelSession.level.id) &&
+            canClaimChapterChest(progressedSave, chapter),
+        );
+        if (justUnlockedChest) {
+          addNotification(translate(state.locale, "chapterChest.ready"));
+        }
+        notifyClaimableEventMilestone(beforeShotSave, progressedSave);
         await trackCurrencyDelta(beforeShotSave, progressedSave, "level_complete", {
           levelId: levelSession.level.id,
         });
@@ -562,14 +973,19 @@ export function createGameSession(input: {
         await persist();
       } else if (summary.failAchieved) {
         const failOfferDecision = decideFailOffer({
-          save: state.save,
+          save: nextSave,
           remoteConfig: state.remoteConfig,
           shopOffers: state.shopOffers,
           continueOffersUsed: levelSession.continueOffersUsed,
         });
         updateState({
           currentScreen: "fail",
+          save: nextSave,
         });
+        if (saveChanged) {
+          refreshShopOffers(nextSave);
+          updateTutorialStep(nextSave);
+        }
         await input.platform.lifecycle.stopGameplay();
         await input.platform.analytics.track("level_fail", {
           levelId: levelSession.level.id,
@@ -586,6 +1002,12 @@ export function createGameSession(input: {
           piggyBankShown: Boolean(failOfferDecision.piggyBank?.isNudged),
           piggyBankFillRatio: failOfferDecision.piggyBank?.fillRatio ?? 0,
         });
+      } else if (saveChanged) {
+        updateState({
+          save: nextSave,
+        });
+        refreshShopOffers(nextSave);
+        updateTutorialStep(nextSave);
       } else {
         emitter.emit("state", state);
       }
@@ -746,6 +1168,7 @@ export function createGameSession(input: {
         reason: "double_win_reward",
         multiplier: state.remoteConfig.ads.rewardDoubleRewardMultiplier,
       });
+      notifyClaimableEventMilestone(beforeSave, updated);
       await trackCurrencyDelta(beforeSave, updated, "double_win_reward", {
         levelId: state.activeLevel.level.id,
       });
@@ -797,21 +1220,31 @@ export function createGameSession(input: {
         await input.platform.serverTime.now(),
         dailyRewards,
       );
+      const updatedSave = markTutorialStep(result.save, "dailyReward");
       updateState({
-        save: result.save,
+        save: updatedSave,
         currentScreen: "map",
         dailyRewardAvailable: false,
       });
-      refreshShopOffers(result.save);
+      refreshShopOffers(updatedSave);
+      updateTutorialStep(updatedSave);
       await input.platform.analytics.track("daily_reward_claimed", {
         day: result.reward.day,
       });
-      await trackCurrencyDelta(beforeSave, result.save, "daily_reward", {
+      notifyClaimableEventMilestone(beforeSave, updatedSave);
+      await trackCurrencyDelta(beforeSave, updatedSave, "daily_reward", {
         day: result.reward.day,
       });
-      addNotification(`${translate(state.locale, "daily.title")} +${result.reward.day}`);
-      await persist();
-    },
+        addNotification(`${translate(state.locale, "daily.title")} +${result.reward.day}`);
+        await maybeShowChapterUnlockRevealOnMap();
+        if (!state.rewardReveal) {
+          setMapSpotlightFromSave(updatedSave, {
+            clearIfNone: true,
+            ignoreDailyReward: true,
+          });
+        }
+        await persist();
+      },
     async claimQuest(questId) {
       const beforeSave = state.save;
       const result = claimQuestReward(state.save, questDefinitions, questId);
@@ -819,7 +1252,13 @@ export function createGameSession(input: {
         save: result.save,
       });
       refreshShopOffers(result.save);
+      updateTutorialStep(result.save);
+      setMapSpotlightFromSave(result.save, {
+        clearIfNone: true,
+        ignoreDailyReward: true,
+      });
       await input.platform.analytics.track("quest_claimed", { questId });
+      notifyClaimableEventMilestone(beforeSave, result.save);
       await trackCurrencyDelta(beforeSave, result.save, "quest", { questId });
       addNotification(translate(state.locale, "quest.claim"));
       await persist();
@@ -922,6 +1361,7 @@ export function createGameSession(input: {
         save: updated,
       });
       refreshShopOffers(updated);
+      updateTutorialStep(updated);
       await input.platform.analytics.track("iap_success", {
         offerId,
         validationStatus: validation.status,
@@ -931,7 +1371,17 @@ export function createGameSession(input: {
       await persist();
     },
     async restoreArea(nodeId) {
-      const node = chapters.flatMap((chapter) => chapter.restorationNodes).find((item) => item.id === nodeId);
+      if (
+        state.mapSpotlight?.action.action === "restore-node" &&
+        state.mapSpotlight.action.id === nodeId
+      ) {
+        clearMapSpotlight();
+      }
+
+      const chapter = chapters.find((item) =>
+        item.restorationNodes.some((restorationNode) => restorationNode.id === nodeId),
+      );
+      const node = chapter?.restorationNodes.find((item) => item.id === nodeId);
       if (!node) {
         throw new Error(`Unknown restoration node ${nodeId}`);
       }
@@ -939,19 +1389,148 @@ export function createGameSession(input: {
       await input.platform.analytics.track("meta_restore_started", { nodeId });
       const restoredSave = restoreNode(state.save, node);
       const updated = applyQuestProgress(
-        restoredSave,
+        markTutorialStep(restoredSave, "restore"),
         questDefinitions,
         { restoration_completed: 1 },
         new Date().toISOString(),
+      );
+      const chapterRestorationComplete = Boolean(
+        chapter?.restorationNodes.every((restorationNode) =>
+          updated.progression.restoredNodes.includes(restorationNode.id),
+        ),
       );
       updateState({
         save: updated,
       });
       refreshShopOffers(updated);
+      updateTutorialStep(updated);
+      showRewardReveal({
+        tagKey: "reward.reveal.restorationTag",
+        titleKey: node.titleKey,
+        bodyKey: "reward.reveal.restorationBody",
+        chapterId: node.chapterId,
+        restorationNodeId: node.id,
+        primaryAction: chapterRestorationComplete
+          ? {
+              action: "start-current-level",
+              labelKey: "reward.reveal.keepPlaying",
+            }
+          : {
+              action: "open-screen",
+              id: "restoration",
+              labelKey: "reward.reveal.viewNextRestore",
+            },
+      });
 
       await input.platform.analytics.track("meta_restore_completed", { nodeId });
       await trackCurrencyDelta(beforeSave, updated, "restoration", { nodeId });
       addNotification(translate(state.locale, node.titleKey));
+      await persist();
+    },
+    async claimChapterChest(chapterId) {
+      const chapter = chapters.find((item) => item.id === chapterId);
+      if (!chapter) {
+        throw new Error(`Unknown chapter ${chapterId}`);
+      }
+
+      if (!canClaimChapterChest(state.save, chapter)) {
+        return;
+      }
+
+      const beforeSave = state.save;
+      const claimedSave = claimChapterChest(state.save, chapter);
+      const rewardedSave = applyRewardGrant(claimedSave, chapter.chapterChest);
+      updateState({
+        save: rewardedSave,
+      });
+      refreshShopOffers(rewardedSave);
+      updateTutorialStep(rewardedSave);
+      const chapterFollowUp = planChapterFollowUp({
+        save: rewardedSave,
+        chapters,
+        chapterId,
+        event: getActiveEvent(),
+      });
+      const rewardReveal: RewardRevealState = {
+        tagKey: "reward.reveal.chapterChestTag",
+        titleKey: chapter.chapterChest.labelKey ?? "reward.chapterChest",
+        bodyKey: "reward.reveal.body",
+        rewards: chapter.chapterChest,
+      };
+      if (chapterFollowUp) {
+        let nextSave = rewardedSave;
+        if (chapterFollowUp.chapterId) {
+          nextSave = markSeenFlag(
+            rewardedSave,
+            getChapterUnlockSeenKey(chapterFollowUp.chapterId),
+          );
+          if (nextSave !== rewardedSave) {
+            updateState({
+              save: nextSave,
+            });
+          }
+        }
+        rewardReveal.featureHighlight = chapterFollowUp.highlight;
+        rewardReveal.primaryAction = chapterFollowUp.primaryAction;
+      }
+      showRewardReveal(rewardReveal);
+      notifyClaimableEventMilestone(beforeSave, rewardedSave);
+      await trackCurrencyDelta(beforeSave, rewardedSave, "chapter_chest", {
+        chapterId,
+        starsEarned: chapterStarsEarned(rewardedSave, chapter),
+      });
+      addNotification(translate(state.locale, chapter.chapterChest.labelKey ?? "reward.chapterChest"));
+      await persist();
+    },
+    async claimEventReward(milestoneId) {
+      if (
+        state.mapSpotlight?.action.action === "claim-event-reward" &&
+        state.mapSpotlight.action.id === milestoneId
+      ) {
+        clearMapSpotlight();
+      }
+
+      const activeEvent = getActiveEvent();
+      if (!activeEvent) {
+        throw new Error("No live event configured.");
+      }
+
+      const beforeSave = state.save;
+      const claimed = claimEventMilestone(state.save, activeEvent, milestoneId);
+      updateState({
+        save: claimed.save,
+      });
+      refreshShopOffers(claimed.save);
+      updateTutorialStep(claimed.save);
+      const rewardReveal: RewardRevealState = {
+        tagKey: "reward.reveal.eventTag",
+        titleKey: claimed.milestone.titleKey,
+        bodyKey: "reward.reveal.body",
+        rewards: claimed.milestone.rewards,
+      };
+      const followUpSpotlight = planSessionGoalSpotlight({
+        save: claimed.save,
+        chapters,
+        quests: questDefinitions,
+        dailyRewardAvailable: state.dailyRewardAvailable,
+        event: activeEvent,
+        allowEventGoals: canAllowEventGoals(claimed.save),
+        ignoreDailyReward: true,
+      });
+      if (followUpSpotlight) {
+        rewardReveal.featureHighlight = {
+          tagKey: followUpSpotlight.tagKey,
+          titleKey: followUpSpotlight.titleKey,
+          bodyKey: followUpSpotlight.bodyKey,
+        };
+        rewardReveal.primaryAction = followUpSpotlight.action;
+      }
+      showRewardReveal(rewardReveal);
+      await trackCurrencyDelta(beforeSave, claimed.save, "event_reward", {
+        eventId: activeEvent.id,
+        milestoneId,
+      });
+      addNotification(translate(state.locale, claimed.milestone.titleKey));
       await persist();
     },
     async claimInboxItem(itemId) {
@@ -976,8 +1555,24 @@ export function createGameSession(input: {
         save: nextSave,
       });
       refreshShopOffers(nextSave);
+      updateTutorialStep(nextSave);
+      if (item.source === "comeback") {
+        setMapSpotlightFromSave(nextSave, {
+          clearIfNone: true,
+          ignoreDailyReward: true,
+        });
+      }
       await trackCurrencyDelta(beforeSave, nextSave, "inbox_claim", { itemId });
       await persist();
+    },
+    async dismissRewardReveal() {
+      if (!state.rewardReveal) {
+        return;
+      }
+      promoteRewardRevealToMapSpotlight(state.rewardReveal);
+      updateState({
+        rewardReveal: null,
+      });
     },
     async requestAuth(reason) {
       await input.platform.analytics.track("auth_prompt_shown", { reason });
@@ -1008,6 +1603,13 @@ export function createGameSession(input: {
             ...state.save.settings,
             language,
           },
+        },
+      });
+      updateTutorialStep({
+        ...state.save,
+        settings: {
+          ...state.save.settings,
+          language,
         },
       });
       await persist();

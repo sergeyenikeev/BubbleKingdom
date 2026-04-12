@@ -143,6 +143,22 @@ export const shopCatalog: ShopOfferDefinition[] = [
     yandexProductId: "piggy_bank",
   },
   {
+    id: "ad_light",
+    sku: "ad_light",
+    titleKey: "shop.adlight.title",
+    descriptionKey: "shop.adlight.description",
+    type: "ad_light",
+    price: {
+      platformPriceId: "ad_light",
+    },
+    rewards: {
+      source: "purchase",
+      gems: 20,
+    },
+    badgeKey: "shop.badge.popular",
+    yandexProductId: "ad_light",
+  },
+  {
     id: "no_ads",
     sku: "no_ads",
     titleKey: "shop.noads.title",

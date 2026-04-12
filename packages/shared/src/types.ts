@@ -109,6 +109,7 @@ export interface ChapterDefinition {
   zoneTheme: string;
   unlockLevel: number;
   levels: number[];
+  chapterChestStarsRequired: number;
   restorationNodes: RestorationNodeDefinition[];
   chapterChest: RewardGrant;
 }
@@ -122,6 +123,22 @@ export interface RewardGrant {
   boosters?: Partial<Record<BoosterId, number>>;
   stars?: number;
   labelKey?: string;
+}
+
+export interface EventMilestoneDefinition {
+  id: string;
+  titleKey: string;
+  descriptionKey: string;
+  tokenCost: number;
+  rewards: RewardGrant;
+}
+
+export interface LiveEventDefinition {
+  id: string;
+  titleKey: string;
+  subtitleKey: string;
+  descriptionKey: string;
+  rewardTrack: EventMilestoneDefinition[];
 }
 
 export interface DailyRewardStep {
@@ -157,6 +174,7 @@ export interface ShopOfferDefinition {
     | "booster_pack"
     | "renovation_pack"
     | "piggy_bank"
+    | "ad_light"
     | "no_ads"
     | "season_pass";
   price:
