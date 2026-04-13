@@ -151,6 +151,7 @@ test("fail overlay can sell a small gem rescue pack without leaving the recovery
     "The free ad path is still available below if you would rather save gems.",
   );
   await expect(page.locator(".fail-modal .cta-row-stacked.is-secondary-recovery")).toHaveCount(1);
+  await expect(page.locator(".fail-modal .fail-footer-row.is-secondary-exit")).toHaveCount(1);
   await expect(page.locator('.fail-modal > .cta-row-stacked [data-action="continue-rewarded"]')).toHaveClass(
     /ghost-btn/,
   );
@@ -194,11 +195,69 @@ test("fail rescue purchase promotes gem continue even for rewarded-primary playe
     "The free ad path is still available below if you would rather save gems.",
   );
   await expect(page.locator(".fail-modal .cta-row-stacked.is-secondary-recovery")).toHaveCount(1);
+  await expect(page.locator(".fail-modal .fail-footer-row.is-secondary-exit")).toHaveCount(1);
   await expect(page.locator('.fail-modal > .cta-row-stacked [data-action="continue-rewarded"]')).toHaveClass(
     /ghost-btn/,
   );
   await expect(page.locator('.overlay-focus-card [data-action="continue-gems"]')).toHaveCount(1);
   await expect(page.locator('.fail-modal > .cta-row-stacked [data-action="continue-rewarded"]')).toHaveCount(1);
+});
+
+test("fail rescue retry clears recovery ready state before the next fail", async ({ page }) => {
+  await openDebugShell(page);
+  await seedDebugFailProfile(page, {
+    levelId: 24,
+    gems: 0,
+    rewardedViews: 0,
+    piggyBankGold: 0,
+    failVariant: "rewarded_primary",
+  });
+  await page.reload();
+  await expect(page.locator(".brand-title")).toBeVisible();
+  await dismissDailyReward(page);
+  await forceDebugFail(page, 24);
+
+  const rescueCard = page.locator('.fail-offer-card[data-offer-id="gem_pack_s"]');
+  await rescueCard.locator('[data-action="purchase-offer"][data-id="gem_pack_s"]').click();
+
+  await expect(page.locator(".fail-modal > h2")).toContainText("Recovery ready");
+  await page.click('.fail-footer-row [data-action="restart-level"]');
+  await expect(page.locator(".level-hud")).toBeVisible();
+
+  await forceDebugFail(page, 24);
+
+  await expect(page.locator(".fail-modal > h2")).not.toContainText("Recovery ready");
+  await expect(page.locator(".overlay-focus-card.is-recovery-ready")).toHaveCount(0);
+  await expect(page.locator(".fail-secondary-note")).toHaveCount(0);
+  await expect(page.locator(".fail-modal .fail-footer-row.is-secondary-exit")).toHaveCount(0);
+});
+
+test("fail rescue map exit keeps momentum with a recovery spotlight on the map", async ({ page }) => {
+  await openDebugShell(page);
+  await seedDebugFailProfile(page, {
+    levelId: 24,
+    gems: 0,
+    rewardedViews: 0,
+    piggyBankGold: 0,
+    failVariant: "rewarded_primary",
+  });
+  await page.reload();
+  await expect(page.locator(".brand-title")).toBeVisible();
+  await dismissDailyReward(page);
+  await forceDebugFail(page, 24);
+
+  const rescueCard = page.locator('.fail-offer-card[data-offer-id="gem_pack_s"]');
+  await rescueCard.locator('[data-action="purchase-offer"][data-id="gem_pack_s"]').click();
+
+  await expect(page.locator(".fail-modal > h2")).toContainText("Recovery ready");
+  await page.click('.fail-footer-row [data-action="acknowledge-level"]');
+
+  const spotlight = page.locator(".spotlight-card");
+  await expect(spotlight).toContainText("Recovery gems are ready");
+  await expect(spotlight).toContainText("You now have more gems for continues");
+  await spotlight.locator('[data-action="start-current-level"]').click();
+
+  await expect(page.locator(".prelevel-modal")).toBeVisible();
 });
 
 test("shop keeps no ads visible after buying ad light while removing the lighter offer", async ({

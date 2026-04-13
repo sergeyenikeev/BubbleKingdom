@@ -446,6 +446,20 @@ export function createGameSession(input: {
     });
   };
 
+  const setFailRecoveryMapSpotlight = () => {
+    updateState({
+      mapSpotlight: {
+        tagKey: "reward.reveal.gemSafetyTag",
+        titleKey: "reward.reveal.gemSafetyTitle",
+        bodyKey: "reward.reveal.gemSafetyBody",
+        action: {
+          action: "start-current-level",
+          labelKey: "reward.reveal.keepPlaying",
+        },
+      },
+    });
+  };
+
   const promoteRewardRevealToMapSpotlight = (reveal: RewardRevealState) => {
     if (!reveal.featureHighlight || !reveal.primaryAction) {
       return;
@@ -1827,6 +1841,8 @@ export function createGameSession(input: {
       await persist();
     },
     async acknowledgeLevelResult() {
+      const keepRecoveryMomentum =
+        state.currentScreen === "fail" && state.failRecoveryHint === "gems_continue";
       updateState({
         currentScreen: "map",
         activeLevel: null,
@@ -1834,6 +1850,9 @@ export function createGameSession(input: {
       });
       await input.platform.lifecycle.stopGameplay();
       await openScreenInternal("map");
+      if (keepRecoveryMomentum && !state.rewardReveal) {
+        setFailRecoveryMapSpotlight();
+      }
     },
   };
 

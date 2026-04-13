@@ -125,6 +125,9 @@ Playwright smoke covers:
 - the same rescue state now also asserts an explicit optional-fallback note for rewarded continue, protecting monetization transparency on the fail screen
 - browser smoke also asserts that this fallback lives in a visually demoted secondary-action row, preserving single-focus CTA hierarchy after rescue purchases
 - smoke now also asserts the rewarded fallback button itself renders as `ghost` under that row, so the hierarchy is enforced at the control level and not only by layout
+- smoke now also verifies that the `Retry / Map` footer becomes a demoted exit row during `Recovery ready`, instead of competing with the purchased continue CTA
+- smoke verifies that choosing `Retry` after a rescue purchase removes the `Recovery ready` headline on the next fail, and integration covers the same `failRecoveryHint` reset contract for both retry and map exit
+- exiting to the map after a rescue purchase is now covered as its own flow: the fail state must clear, but the map must immediately surface a recovery spotlight that routes the player back into the next level
 - dismissed chapter-chest reveals still leave an event spotlight on the map until the player opens that event
 
 Primary file:

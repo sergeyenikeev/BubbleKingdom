@@ -303,6 +303,12 @@ select {
   opacity: 0.92;
 }
 
+.fail-footer-row.is-secondary-exit {
+  padding-top: 4px;
+  border-top: 1px dashed rgba(112, 92, 74, 0.12);
+  opacity: 0.74;
+}
+
 .primary-btn,
 .secondary-btn,
 .ghost-btn,

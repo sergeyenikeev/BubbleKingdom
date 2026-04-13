@@ -699,6 +699,78 @@ describe("game session integration", () => {
     expect(session.getState().save.currencies.gems).toBe(63);
   });
 
+  it("clears fail recovery hint when retrying after a fail-screen rescue purchase", async () => {
+    const session = createSession();
+    await session.boot();
+    await session.startLevel(24);
+
+    const active = session.getState().activeLevel;
+    if (!active) {
+      throw new Error("Expected active level");
+    }
+    active.board.movesRemaining = 1;
+    active.board.cells = [
+      [null, null, null, null, null, null, null, null],
+      [null, null, null, null, null, null, null, null],
+      [null, null, null, null, null, null, null, null],
+      [null, null, null, null, null, null, null, null],
+      [null, null, null, null, null, null, null, null],
+      [null, null, null, null, null, null, null, null],
+    ];
+    active.board.queue = ["ruby"];
+
+    await session.fireShot(-1.1);
+    expect(session.getState().currentScreen).toBe("fail");
+
+    await session.purchaseOffer("gem_pack_s");
+    expect(session.getState().failRecoveryHint).toBe("gems_continue");
+
+    await session.restartLevel();
+    expect(session.getState().currentScreen).toBe("level");
+    expect(session.getState().failRecoveryHint).toBeNull();
+  });
+
+  it("turns a fail-screen rescue exit into a recovery spotlight on the map", async () => {
+    const session = createSession();
+    await session.boot();
+    await session.startLevel(24);
+
+    const active = session.getState().activeLevel;
+    if (!active) {
+      throw new Error("Expected active level");
+    }
+    active.board.movesRemaining = 1;
+    active.board.cells = [
+      [null, null, null, null, null, null, null, null],
+      [null, null, null, null, null, null, null, null],
+      [null, null, null, null, null, null, null, null],
+      [null, null, null, null, null, null, null, null],
+      [null, null, null, null, null, null, null, null],
+      [null, null, null, null, null, null, null, null],
+    ];
+    active.board.queue = ["ruby"];
+
+    await session.fireShot(-1.1);
+    expect(session.getState().currentScreen).toBe("fail");
+
+    await session.purchaseOffer("gem_pack_s");
+    expect(session.getState().failRecoveryHint).toBe("gems_continue");
+
+    await session.acknowledgeLevelResult();
+    expect(session.getState().currentScreen).toBe("map");
+    expect(session.getState().activeLevel).toBeNull();
+    expect(session.getState().failRecoveryHint).toBeNull();
+    expect(session.getState().mapSpotlight).toEqual({
+      tagKey: "reward.reveal.gemSafetyTag",
+      titleKey: "reward.reveal.gemSafetyTitle",
+      bodyKey: "reward.reveal.gemSafetyBody",
+      action: {
+        action: "start-current-level",
+        labelKey: "reward.reveal.keepPlaying",
+      },
+    });
+  });
+
   it("shows a restoration follow-up reveal after buying the renovation pack", async () => {
     const session = createSession();
     await session.boot();

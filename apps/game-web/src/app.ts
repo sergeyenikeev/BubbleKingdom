@@ -946,10 +946,18 @@ function renderOverlay(
         ? {
             ...failDecisionBase,
             primaryAction: "gems_continue" as const,
-            headlineKey: "fail.offer.gems.readyTag" as const,
-            bodyKey: "fail.offer.gems.readyBody" as const,
+            headlineKey: "fail.offer.gems.title" as const,
+            bodyKey: "fail.offer.gems.body" as const,
           }
         : failDecisionBase;
+    const recoveryReadySecondaryActions =
+      state.failRecoveryHint === "gems_continue" && failDecision?.primaryAction === "gems_continue";
+    const failHeadlineKey = recoveryReadySecondaryActions
+      ? "fail.offer.gems.readyTag"
+      : failDecision?.headlineKey ?? "level.failFlavor";
+    const failBodyKey = recoveryReadySecondaryActions
+      ? "fail.offer.gems.readyBody"
+      : failDecision?.bodyKey ?? "level.failFlavor";
     const gemContinueCost =
       failDecision?.gemCost ??
       (state.activeLevel
@@ -972,8 +980,6 @@ function renderOverlay(
             shopOffers: state.shopOffers,
           })
         : null;
-    const recoveryReadySecondaryActions =
-      state.failRecoveryHint === "gems_continue" && failDecision?.primaryAction === "gems_continue";
     const rewardedSecondaryButtonClass = recoveryReadySecondaryActions
       ? "ghost-btn"
       : resolveFailButtonClass(failDecision?.primaryAction, "rewarded_continue");
@@ -992,7 +998,8 @@ function renderOverlay(
         ? `<div class="small fail-secondary-note">${t("fail.offer.rewarded.optionalHint")}</div>`
         : "";
     const secondaryActionClass = recoveryReadySecondaryActions ? "is-secondary-recovery" : "";
-    return `<div class="overlay-modal"><div class="panel modal-card fail-modal"><div class="panel-actions"><span class="tag">${t("level.fail")}</span><span class="tag">${t("ui.score")} ${board?.score ?? 0}</span>${failDecision ? `<span class="tag tag-accent">${t("ui.recommended")}</span>` : ""}</div><h2>${failDecision ? t(failDecision.headlineKey) : t("level.failFlavor")}</h2><p class="small fail-copy">${failDecision ? t(failDecision.bodyKey) : t("level.failFlavor")}</p>${renderFailOverlayFocusCard(state, failDecision, gemContinueCost, t)}${renderRemainingObjective(state, t)}${alternativeActions ? `${alternativeActionNote}<div class="cta-row cta-row-stacked ${secondaryActionClass}">${alternativeActions}</div>` : ""}${showPiggyUpsell && failDecision ? renderPiggyBankUpsellCard(state, failDecision, t) : ""}${failRescueGemOffer ? renderFailGemRescueCard(failRescueGemOffer, state.shopOffers.find((offer) => offer.id === failRescueGemOffer.offerId) ?? null, t) : ""}<div class="cta-row"><button class="ghost-btn" data-action="restart-level">${t("level.retry")}</button><button class="ghost-btn" data-action="acknowledge-level">${t("screen.map")}</button></div></div></div>`;
+    const failFooterClass = recoveryReadySecondaryActions ? "is-secondary-exit" : "";
+    return `<div class="overlay-modal"><div class="panel modal-card fail-modal"><div class="panel-actions"><span class="tag">${t("level.fail")}</span><span class="tag">${t("ui.score")} ${board?.score ?? 0}</span>${failDecision ? `<span class="tag tag-accent">${t("ui.recommended")}</span>` : ""}</div><h2>${t(failHeadlineKey)}</h2><p class="small fail-copy">${t(failBodyKey)}</p>${renderFailOverlayFocusCard(state, failDecision, gemContinueCost, t)}${renderRemainingObjective(state, t)}${alternativeActions ? `${alternativeActionNote}<div class="cta-row cta-row-stacked ${secondaryActionClass}">${alternativeActions}</div>` : ""}${showPiggyUpsell && failDecision ? renderPiggyBankUpsellCard(state, failDecision, t) : ""}${failRescueGemOffer ? renderFailGemRescueCard(failRescueGemOffer, state.shopOffers.find((offer) => offer.id === failRescueGemOffer.offerId) ?? null, t) : ""}<div class="cta-row fail-footer-row ${failFooterClass}"><button class="ghost-btn" data-action="restart-level">${t("level.retry")}</button><button class="ghost-btn" data-action="acknowledge-level">${t("screen.map")}</button></div></div></div>`;
   }
 
   return `<div class="overlay-modal"><div class="panel modal-card">${renderModalContent(
