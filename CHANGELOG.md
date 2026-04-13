@@ -9,6 +9,7 @@ The project follows Semantic Versioning and Conventional Commits.
 - toned down the fail-screen `retry / map` footer when `Recovery ready` is active, so purchased gem recovery remains the single clear next step
 - added regression coverage that `failRecoveryHint` is cleared on both `Retry` and `Map` exit after in-fail gem rescue purchases
 - turning back to the map from an in-fail gem rescue now keeps a dedicated recovery spotlight alive, so the purchase still hands the player toward the next run instead of dropping them cold on the map
+- upgraded that recovery spotlight into an accent state with a primary CTA, so paid rescue momentum stays visually stronger than ordinary map guidance
 
 ## [0.1.0-alpha] - 2026-04-08
 

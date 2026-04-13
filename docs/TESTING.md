@@ -128,6 +128,7 @@ Playwright smoke covers:
 - smoke now also verifies that the `Retry / Map` footer becomes a demoted exit row during `Recovery ready`, instead of competing with the purchased continue CTA
 - smoke verifies that choosing `Retry` after a rescue purchase removes the `Recovery ready` headline on the next fail, and integration covers the same `failRecoveryHint` reset contract for both retry and map exit
 - exiting to the map after a rescue purchase is now covered as its own flow: the fail state must clear, but the map must immediately surface a recovery spotlight that routes the player back into the next level
+- the same map spotlight is now asserted as an accent treatment with a primary CTA, so the paid-recovery route remains visually dominant after returning to the kingdom shell
 - dismissed chapter-chest reveals still leave an event spotlight on the map until the player opens that event
 
 Primary file:

@@ -604,11 +604,12 @@ function renderMapSpotlightCard(state: GameSessionState, t: (key: string) => str
     return "";
   }
 
+  const isRecoverySpotlight = state.mapSpotlight.tagKey === "reward.reveal.gemSafetyTag";
   const actionId = state.mapSpotlight.action.id
     ? ` data-id="${state.mapSpotlight.action.id}"`
     : "";
 
-  return `<div class="goal-card spotlight-card"><div class="panel-actions"><span class="tag tag-accent">${t("ui.nextStep")}</span><span class="tag">${t(state.mapSpotlight.tagKey)}</span></div><strong>${t(state.mapSpotlight.titleKey)}</strong><div class="small">${t(state.mapSpotlight.bodyKey)}</div><div class="cta-row"><button class="secondary-btn" data-action="${state.mapSpotlight.action.action}"${actionId}>${t(state.mapSpotlight.action.labelKey)}</button></div></div>`;
+  return `<div class="goal-card spotlight-card ${isRecoverySpotlight ? "is-recovery-ready" : ""}"><div class="panel-actions"><span class="tag tag-accent">${t("ui.nextStep")}</span><span class="tag ${isRecoverySpotlight ? "tag-accent" : ""}">${t(state.mapSpotlight.tagKey)}</span></div><strong>${t(state.mapSpotlight.titleKey)}</strong><div class="small">${t(state.mapSpotlight.bodyKey)}</div><div class="cta-row"><button class="${isRecoverySpotlight ? "primary-btn" : "secondary-btn"}" data-action="${state.mapSpotlight.action.action}"${actionId}>${t(state.mapSpotlight.action.labelKey)}</button></div></div>`;
 }
 
 function getRecommendedQuestId(

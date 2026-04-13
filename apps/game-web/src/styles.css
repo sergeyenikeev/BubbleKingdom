@@ -281,6 +281,14 @@ select {
   border: 1px solid rgba(76, 191, 176, 0.22);
 }
 
+.spotlight-card.is-recovery-ready {
+  background:
+    radial-gradient(circle at top right, rgba(255, 170, 92, 0.2), transparent 34%),
+    linear-gradient(180deg, rgba(255, 246, 232, 0.98), rgba(255, 255, 255, 0.9));
+  border-color: rgba(255, 150, 76, 0.3);
+  box-shadow: 0 14px 32px rgba(255, 150, 76, 0.14);
+}
+
 .coach-card-compact {
   padding: 12px 14px;
 }

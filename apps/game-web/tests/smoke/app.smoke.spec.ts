@@ -253,8 +253,10 @@ test("fail rescue map exit keeps momentum with a recovery spotlight on the map",
   await page.click('.fail-footer-row [data-action="acknowledge-level"]');
 
   const spotlight = page.locator(".spotlight-card");
+  await expect(spotlight).toHaveClass(/is-recovery-ready/);
   await expect(spotlight).toContainText("Recovery gems are ready");
   await expect(spotlight).toContainText("You now have more gems for continues");
+  await expect(spotlight.locator('[data-action="start-current-level"]')).toHaveClass(/primary-btn/);
   await spotlight.locator('[data-action="start-current-level"]').click();
 
   await expect(page.locator(".prelevel-modal")).toBeVisible();
