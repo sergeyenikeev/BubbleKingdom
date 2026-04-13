@@ -38,6 +38,10 @@ The project follows Semantic Versioning and Conventional Commits.
 - Added a one-time chapter-unlock reveal on map entry so opening chapter 2 now lands as an explicit meta beat with a direct CTA into the newly available level flow.
 - Added regression coverage for `new chapter -> reveal -> start next chapter`, protecting the post-unlock route across unit, integration, and browser smoke suites.
 - Added persistent map follow-up spotlights after dismissing major reveal modals, so newly unlocked zones and featured events still surface a clear next CTA on the map instead of disappearing cold.
+- Polished fail-recovery UX so in-fail gem rescue purchases now surface a dedicated `Recovery ready` gem-continue state with explicit `ready now / after continue` gem totals, while the rescue helper card uses cleaned-up coverage copy instead of legacy fallback strings.
+- Clarified fail-screen ethics after rescue purchases by explicitly labeling the rewarded branch as an optional free fallback beneath the purchased gem-continue CTA.
+- Visually demoted secondary fail actions under `Recovery ready` with a separated, softer CTA row so the bought gem-continue path stays primary without hiding the free fallback.
+- Demoted the rewarded fallback even further under `Recovery ready` by rendering it as a `ghost` CTA, keeping the purchased gem-continue action unmistakably primary.
 - Added a dedicated `Ad Light` offer to the monetization catalog, keeping `No Ads` as a visible upgrade path and validating banner/interstitial suppression behavior separately in integration and smoke.
 - Improved shop transparency for ad purchases with per-offer ad-surface breakdowns, upgrade messaging on `No Ads` after `Ad Light`, and stronger deterministic regression coverage around ad-pacing experiment assignments.
 - Added a persistent shop ad-status card that explains the player's current ad mode, keeps rewarded help explicitly optional, and surfaces a direct `No Ads` upgrade CTA after `Ad Light` is purchased.
@@ -48,6 +52,7 @@ The project follows Semantic Versioning and Conventional Commits.
 - Added product-aware post-purchase beats for `Gem Pack M/L` and `Season Pass`, steering gem bundles into safer next-level play and the season bundle straight into the live event track.
 - Added a fail-screen gem-pack rescue card and kept gem-pack purchases inside the fail recovery flow, so buying emergency gems no longer kicks players into a generic shop reveal before they can continue.
 - Added a pure fail-rescue gem-pack planner plus transparent fail-card coverage copy, so the player can now see the gem shortfall, the selected pack payout, and the post-continue remainder before buying.
+- Added a runtime fail-recovery hint that promotes `continue with gems` right after an in-fail gem purchase, preventing rewarded-first variants from fighting the player's just-purchased rescue path.
 - Added integration and browser smoke coverage for `dismiss reveal -> map spotlight -> follow-up action`, protecting the softer post-reveal guidance path.
 - Added post-claim spotlight planning for daily, comeback, and event reward flows so the map/reveal surface can ignore stale daily prompts and route players toward the next meaningful restore or play beat.
 - Simplified the map hero when a spotlight is active by suppressing the competing current-goal card and default primary Play CTA, leaving one clearer next-step action after major beats.

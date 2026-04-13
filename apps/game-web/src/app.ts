@@ -932,7 +932,7 @@ function renderOverlay(
       return `<div class="overlay-modal"><div class="panel modal-card fail-modal"><div class="panel-actions"><span class="tag">${t("level.win")}</span><span class="tag">${t("ui.score")} ${board?.score ?? 0}</span></div><h2>${t("level.winFlavor")}</h2>${renderWinOverlayFocusCard(state, t)}${renderWinRewardSummary(state, t)}<div class="cta-row"><button class="${hasWinBonusOffer ? "secondary-btn" : "primary-btn"}" data-action="acknowledge-level">${t("map.continue")}</button><button class="ghost-btn" data-action="acknowledge-level">${t("screen.map")}</button></div></div></div>`;
     }
 
-    const failDecision =
+    const failDecisionBase =
       state.activeLevel
         ? decideFailOffer({
             save: state.save,
@@ -941,6 +941,15 @@ function renderOverlay(
             continueOffersUsed: state.activeLevel.continueOffersUsed,
           })
         : null;
+    const failDecision =
+      state.failRecoveryHint === "gems_continue" && failDecisionBase?.hasEnoughGems
+        ? {
+            ...failDecisionBase,
+            primaryAction: "gems_continue" as const,
+            headlineKey: "fail.offer.gems.readyTag" as const,
+            bodyKey: "fail.offer.gems.readyBody" as const,
+          }
+        : failDecisionBase;
     const gemContinueCost =
       failDecision?.gemCost ??
       (state.activeLevel
@@ -963,17 +972,27 @@ function renderOverlay(
             shopOffers: state.shopOffers,
           })
         : null;
+    const recoveryReadySecondaryActions =
+      state.failRecoveryHint === "gems_continue" && failDecision?.primaryAction === "gems_continue";
+    const rewardedSecondaryButtonClass = recoveryReadySecondaryActions
+      ? "ghost-btn"
+      : resolveFailButtonClass(failDecision?.primaryAction, "rewarded_continue");
     const alternativeActions = [
       failDecision?.primaryAction === "rewarded_continue"
         ? ""
-        : `<button class="${resolveFailButtonClass(failDecision?.primaryAction, "rewarded_continue")}" data-action="continue-rewarded">${t("reward.watchAdContinue")}</button>`,
+        : `<button class="${rewardedSecondaryButtonClass}" data-action="continue-rewarded">${t("reward.watchAdContinue")}</button>`,
       failDecision?.primaryAction === "gems_continue"
         ? ""
         : `<button class="${resolveFailButtonClass(failDecision?.primaryAction, "gems_continue")}" data-action="continue-gems" ${failDecision && !failDecision.hasEnoughGems ? "disabled" : ""}>${t("level.continueWithGems")} ${gemContinueCost} ${t("currency.gems")}</button>`,
     ]
       .filter(Boolean)
       .join("");
-    return `<div class="overlay-modal"><div class="panel modal-card fail-modal"><div class="panel-actions"><span class="tag">${t("level.fail")}</span><span class="tag">${t("ui.score")} ${board?.score ?? 0}</span>${failDecision ? `<span class="tag tag-accent">${t("ui.recommended")}</span>` : ""}</div><h2>${failDecision ? t(failDecision.headlineKey) : t("level.failFlavor")}</h2><p class="small fail-copy">${failDecision ? t(failDecision.bodyKey) : t("level.failFlavor")}</p>${renderFailOverlayFocusCard(state, failDecision, gemContinueCost, t)}${renderRemainingObjective(state, t)}${alternativeActions ? `<div class="cta-row cta-row-stacked">${alternativeActions}</div>` : ""}${showPiggyUpsell && failDecision ? renderPiggyBankUpsellCard(state, failDecision, t) : ""}${failRescueGemOffer ? renderFailGemRescueCard(failRescueGemOffer, state.shopOffers.find((offer) => offer.id === failRescueGemOffer.offerId) ?? null, t) : ""}<div class="cta-row"><button class="ghost-btn" data-action="restart-level">${t("level.retry")}</button><button class="ghost-btn" data-action="acknowledge-level">${t("screen.map")}</button></div></div></div>`;
+    const alternativeActionNote =
+      recoveryReadySecondaryActions && alternativeActions
+        ? `<div class="small fail-secondary-note">${t("fail.offer.rewarded.optionalHint")}</div>`
+        : "";
+    const secondaryActionClass = recoveryReadySecondaryActions ? "is-secondary-recovery" : "";
+    return `<div class="overlay-modal"><div class="panel modal-card fail-modal"><div class="panel-actions"><span class="tag">${t("level.fail")}</span><span class="tag">${t("ui.score")} ${board?.score ?? 0}</span>${failDecision ? `<span class="tag tag-accent">${t("ui.recommended")}</span>` : ""}</div><h2>${failDecision ? t(failDecision.headlineKey) : t("level.failFlavor")}</h2><p class="small fail-copy">${failDecision ? t(failDecision.bodyKey) : t("level.failFlavor")}</p>${renderFailOverlayFocusCard(state, failDecision, gemContinueCost, t)}${renderRemainingObjective(state, t)}${alternativeActions ? `${alternativeActionNote}<div class="cta-row cta-row-stacked ${secondaryActionClass}">${alternativeActions}</div>` : ""}${showPiggyUpsell && failDecision ? renderPiggyBankUpsellCard(state, failDecision, t) : ""}${failRescueGemOffer ? renderFailGemRescueCard(failRescueGemOffer, state.shopOffers.find((offer) => offer.id === failRescueGemOffer.offerId) ?? null, t) : ""}<div class="cta-row"><button class="ghost-btn" data-action="restart-level">${t("level.retry")}</button><button class="ghost-btn" data-action="acknowledge-level">${t("screen.map")}</button></div></div></div>`;
   }
 
   return `<div class="overlay-modal"><div class="panel modal-card">${renderModalContent(
@@ -1036,7 +1055,15 @@ function renderFailOverlayFocusCard(
   }
 
   if (failDecision.primaryAction === "gems_continue") {
-    return `<div class="reward-highlight-card overlay-focus-card"><div class="panel-actions"><span class="tag tag-accent">${t("ui.nextStep")}</span><span class="tag">${gemContinueCost} ${t("currency.gems")}</span><span class="tag tag-accent">${t("ui.recommended")}</span></div><strong>${t("level.continueWithGems")} ${gemContinueCost} ${t("currency.gems")}</strong><div class="small">${t(failDecision.bodyKey)}</div><div class="cta-row"><button class="primary-btn" data-action="continue-gems" ${!failDecision.hasEnoughGems ? "disabled" : ""}>${t("level.continueWithGems")} ${gemContinueCost} ${t("currency.gems")}</button></div></div>`;
+    const recoveryReady = state.failRecoveryHint === "gems_continue";
+    const emphasisTagKey = recoveryReady ? "fail.offer.gems.readyTag" : "ui.recommended";
+    const bodyKey = recoveryReady ? "fail.offer.gems.readyBody" : failDecision.bodyKey;
+    const gemsReadyNow = state.save.currencies.gems;
+    const gemsLeftAfterContinue = Math.max(0, gemsReadyNow - gemContinueCost);
+    const balanceLine = failDecision.hasEnoughGems
+      ? `<div class="small">${t("fail.offer.gems.balanceNow")} ${gemsReadyNow} ${t("currency.gems")} &middot; ${t("fail.offer.gems.balanceAfter")} ${gemsLeftAfterContinue} ${t("currency.gems")}</div>`
+      : "";
+    return `<div class="reward-highlight-card overlay-focus-card ${recoveryReady ? "is-recovery-ready" : ""}"><div class="panel-actions"><span class="tag tag-accent">${t("ui.nextStep")}</span><span class="tag">${gemContinueCost} ${t("currency.gems")}</span><span class="tag tag-accent">${t(emphasisTagKey)}</span></div><strong>${t("level.continueWithGems")} ${gemContinueCost} ${t("currency.gems")}</strong><div class="small">${t(bodyKey)}</div>${balanceLine}<div class="cta-row"><button class="primary-btn" data-action="continue-gems" ${!failDecision.hasEnoughGems ? "disabled" : ""}>${t("level.continueWithGems")} ${gemContinueCost} ${t("currency.gems")}</button></div></div>`;
   }
 
   if (failDecision.primaryAction === "piggy_bank") {
@@ -1058,20 +1085,13 @@ function renderFailGemRescueCard(
   if (!offer) {
     return "";
   }
-  const resolvedOffer = offer;
   const gemContinueCost = rescuePlan.gemContinueCost;
   const badge = offer.badgeKey ? `<span class="tag">${t(offer.badgeKey)}</span>` : "";
-  const safeCoverageLine = `${t("ui.missing")} ${rescuePlan.shortfall} ${t("currency.gems")} &middot; ${t("fail.offer.gemPack.grants")} ${rescuePlan.gemsGranted} ${t("currency.gems")}`;
-  const safeFollowUpLine = rescuePlan.coversContinue
+  const cleanCoverageLine = `${t("ui.missing")} ${rescuePlan.shortfall} ${t("currency.gems")} &middot; ${t("fail.offer.gemPack.grants")} ${rescuePlan.gemsGranted} ${t("currency.gems")}`;
+  const cleanFollowUpLine = rescuePlan.coversContinue
     ? `${t("fail.offer.gemPack.covers")} &middot; ${t("fail.offer.gemPack.leftover")} ${rescuePlan.leftoverAfterContinue} ${t("currency.gems")}`
     : `${t("fail.offer.gemPack.stillShort")} ${Math.max(0, gemContinueCost - rescuePlan.gemsAfterPurchase)} ${t("currency.gems")}`;
-  const coverageLine = `${t("ui.missing")} ${rescuePlan.shortfall} ${t("currency.gems")} · ${t("fail.offer.gemPack.grants")} ${rescuePlan.gemsGranted} ${t("currency.gems")}`;
-  const followUpLine = rescuePlan.coversContinue
-    ? `${t("fail.offer.gemPack.covers")} · ${t("fail.offer.gemPack.leftover")} ${rescuePlan.leftoverAfterContinue} ${t("currency.gems")}`
-    : `${t("fail.offer.gemPack.stillShort")} ${Math.max(0, gemContinueCost - rescuePlan.gemsAfterPurchase)} ${t("currency.gems")}`;
-  void coverageLine;
-  void followUpLine;
-  return `<div class="offer-card fail-offer-card" data-offer-id="${resolvedOffer.id}"><div class="panel-actions"><strong>${t(resolvedOffer.titleKey)}</strong>${badge}</div><div class="small">${t(resolvedOffer.descriptionKey)}</div><div class="small">${safeCoverageLine}</div><div class="small">${safeFollowUpLine}</div><div class="small">${renderOfferRewards(resolvedOffer, t)}</div><div class="panel-actions"><span class="small">${resolvedOffer.platformPriceLabel}</span><button class="secondary-btn" data-action="purchase-offer" data-id="${resolvedOffer.id}">${t("shop.buy")}</button></div></div>`;
+  return `<div class="offer-card fail-offer-card" data-offer-id="${offer.id}"><div class="panel-actions"><strong>${t(offer.titleKey)}</strong>${badge}</div><div class="small">${t(offer.descriptionKey)}</div><div class="small">${cleanCoverageLine}</div><div class="small">${cleanFollowUpLine}</div><div class="small">${renderOfferRewards(offer, t)}</div><div class="panel-actions"><span class="small">${offer.platformPriceLabel}</span><button class="secondary-btn" data-action="purchase-offer" data-id="${offer.id}">${t("shop.buy")}</button></div></div>`;
 }
 
 function renderRewardRevealFocusCard(state: GameSessionState, t: (key: string) => string) {

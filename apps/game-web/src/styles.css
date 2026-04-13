@@ -297,6 +297,12 @@ select {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.cta-row-stacked.is-secondary-recovery {
+  padding-top: 6px;
+  border-top: 1px solid rgba(112, 92, 74, 0.14);
+  opacity: 0.92;
+}
+
 .primary-btn,
 .secondary-btn,
 .ghost-btn,
@@ -448,6 +454,14 @@ select {
   margin-bottom: 12px;
 }
 
+.overlay-focus-card.is-recovery-ready {
+  background:
+    radial-gradient(circle at top right, rgba(255, 170, 92, 0.2), transparent 34%),
+    linear-gradient(180deg, rgba(255, 246, 232, 0.98), rgba(255, 255, 255, 0.9));
+  border-color: rgba(255, 150, 76, 0.3);
+  box-shadow: 0 14px 32px rgba(255, 150, 76, 0.14);
+}
+
 .reward-reveal-summary {
   background: linear-gradient(180deg, rgba(255, 238, 217, 0.9), rgba(255, 255, 255, 0.84));
   border: 1px solid rgba(255, 141, 59, 0.22);
@@ -457,6 +471,11 @@ select {
 
 .fail-copy {
   margin: -6px 0 0;
+}
+
+.fail-secondary-note {
+  margin-top: 4px;
+  font-weight: 700;
 }
 
 .level-hud {

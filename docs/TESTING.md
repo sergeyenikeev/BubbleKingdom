@@ -61,6 +61,7 @@ Current integration suite validates:
 - fail + rewarded continue
 - fail + gem continue
 - fail + gem-pack rescue purchase that keeps the player on the fail screen and re-enables gem continue
+- fail + gem-pack rescue purchase that promotes gem continue even for rewarded-primary profiles
 - shop open + purchase
 - localization switch
 - locale auto-detect on first boot and manual override persistence
@@ -120,6 +121,10 @@ Playwright smoke covers:
 - chapter-chest and chapter-unlock reveal modals both assert the new focus-card CTA layout before taking their follow-up action
 - win overlay asserts that rewarded double-claim appears exactly once in the focus card, and fail overlay asserts that the recommended recovery action is promoted there while alternative actions stay secondary
 - gems-primary fail flow asserts that gem continue is featured exactly once while rewarded remains secondary, and piggy-primary fail flow asserts the piggy CTA is featured first, then hands off to gem continue after purchase
+- in-fail gem rescue purchases are also covered for a dedicated `Recovery ready` focus state with `ready now / after continue` gem totals, so rewarded-primary players visibly pivot into the purchased gem-continue path without falling back to generic fail copy
+- the same rescue state now also asserts an explicit optional-fallback note for rewarded continue, protecting monetization transparency on the fail screen
+- browser smoke also asserts that this fallback lives in a visually demoted secondary-action row, preserving single-focus CTA hierarchy after rescue purchases
+- smoke now also asserts the rewarded fallback button itself renders as `ghost` under that row, so the hierarchy is enforced at the control level and not only by layout
 - dismissed chapter-chest reveals still leave an event spotlight on the map until the player opens that event
 
 Primary file:

@@ -169,6 +169,7 @@ export interface GameSessionState {
   eventId: string;
   rewardReveal: RewardRevealState | null;
   mapSpotlight: MapSpotlightState | null;
+  failRecoveryHint: "gems_continue" | null;
 }
 
 type GameSessionEvents = {
@@ -241,6 +242,7 @@ export function createGameSession(input: {
     eventId: defaultRemoteConfig.liveops.currentEventId,
     rewardReveal: null,
     mapSpotlight: null,
+    failRecoveryHint: null,
   };
 
   const updateState = (patch: Partial<GameSessionState>) => {
@@ -721,6 +723,7 @@ export function createGameSession(input: {
     }
     updateState({
       currentScreen: screen,
+      failRecoveryHint: screen === "fail" ? state.failRecoveryHint : null,
       levelPreview: screen === "preLevel" ? state.levelPreview : null,
     });
     const showBanner =
@@ -803,6 +806,7 @@ export function createGameSession(input: {
 
     updateState({
       currentScreen: "level",
+      failRecoveryHint: null,
       save,
       activeLevel: {
         level,
@@ -1139,6 +1143,7 @@ export function createGameSession(input: {
         });
         updateState({
           currentScreen: "fail",
+          failRecoveryHint: null,
           save: nextSave,
         });
         if (saveChanged) {
@@ -1220,6 +1225,7 @@ export function createGameSession(input: {
       );
       updateState({
         currentScreen: "level",
+        failRecoveryHint: null,
         save: rewardedSave,
       });
       refreshShopOffers(rewardedSave);
@@ -1259,6 +1265,7 @@ export function createGameSession(input: {
       state.activeLevel.continueOffersUsed += 1;
       updateState({
         currentScreen: "level",
+        failRecoveryHint: null,
         save: updated,
       });
       refreshShopOffers(updated);
@@ -1516,8 +1523,19 @@ export function createGameSession(input: {
 
       const beforeSave = state.save;
       const updated = applyShopOffer(state.save, offer);
+      const failRecoveryHint =
+        state.currentScreen === "fail" &&
+        state.activeLevel &&
+        !state.activeLevel.continueUsed &&
+        (offer.type === "gem_pack" || offer.type === "piggy_bank")
+          ? updated.currencies.gems >=
+            calculateExtraMovesGemCost(state.activeLevel.continueOffersUsed, state.remoteConfig)
+            ? "gems_continue"
+            : null
+          : state.failRecoveryHint;
       updateState({
         save: updated,
+        failRecoveryHint,
       });
       refreshShopOffers(updated);
       updateTutorialStep(updated);
@@ -1812,6 +1830,7 @@ export function createGameSession(input: {
       updateState({
         currentScreen: "map",
         activeLevel: null,
+        failRecoveryHint: null,
       });
       await input.platform.lifecycle.stopGameplay();
       await openScreenInternal("map");

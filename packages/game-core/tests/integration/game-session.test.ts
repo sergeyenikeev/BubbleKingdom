@@ -659,6 +659,46 @@ describe("game session integration", () => {
     expect(session.getState().currentScreen).toBe("level");
   });
 
+  it("promotes gem continue after a fail rescue purchase even when rewarded would normally stay primary", async () => {
+    const session = createSession();
+    await session.boot();
+    session.getState().save.currencies.gems = 0;
+    session.getState().save.economy.rewardedViews = 0;
+    await session.startLevel(24);
+
+    const active = session.getState().activeLevel;
+    if (!active) {
+      throw new Error("Expected active level");
+    }
+    active.board.movesRemaining = 1;
+    active.board.cells = [
+      [null, null, null, null, null, null, null, null],
+      [null, null, null, null, null, null, null, null],
+      [null, null, null, null, null, null, null, null],
+      [null, null, null, null, null, null, null, null],
+      [null, null, null, null, null, null, null, null],
+      [null, null, null, null, null, null, null, null],
+    ];
+    active.board.queue = ["ruby"];
+
+    await session.fireShot(-1.1);
+    expect(session.getState().currentScreen).toBe("fail");
+    expect(session.getState().failRecoveryHint).toBeNull();
+
+    await session.purchaseOffer("gem_pack_s");
+
+    expect(session.getState().currentScreen).toBe("fail");
+    expect(session.getState().rewardReveal).toBeNull();
+    expect(session.getState().failRecoveryHint).toBe("gems_continue");
+    expect(session.getState().save.currencies.gems).toBe(75);
+
+    const continued = await session.continueWithGems();
+    expect(continued).toBe(true);
+    expect(session.getState().currentScreen).toBe("level");
+    expect(session.getState().failRecoveryHint).toBeNull();
+    expect(session.getState().save.currencies.gems).toBe(63);
+  });
+
   it("shows a restoration follow-up reveal after buying the renovation pack", async () => {
     const session = createSession();
     await session.boot();
