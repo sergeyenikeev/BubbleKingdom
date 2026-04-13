@@ -42,7 +42,12 @@ The project follows Semantic Versioning and Conventional Commits.
 - Improved shop transparency for ad purchases with per-offer ad-surface breakdowns, upgrade messaging on `No Ads` after `Ad Light`, and stronger deterministic regression coverage around ad-pacing experiment assignments.
 - Added a persistent shop ad-status card that explains the player's current ad mode, keeps rewarded help explicitly optional, and surfaces a direct `No Ads` upgrade CTA after `Ad Light` is purchased.
 - Promoted `No Ads` to a visually highlighted upgrade card after `Ad Light`, reordered the shop to surface that upgrade earlier, and added smoke coverage for the completed `No Ads active` state.
-- Completed the `No Ads` purchase beat with a single `Back to kingdom` CTA on the ad-status card, so permanent ad removal ends in a clear return-to-play action instead of a dead-end shop state.
+- Completed the `No Ads` purchase beat with a single `Play next level` CTA on the ad-status card, so permanent ad removal drops straight back into the gameplay loop instead of a dead-end shop state.
+- Added a dedicated post-purchase reward reveal for `Starter Pack` and `Welcome Offer`, surfacing the bundle value immediately and handing the player into the next level with a single focused CTA.
+- Added differentiated post-purchase beats for `Booster Pack` and `Renovation Pack`, sending power bundles back into gameplay and upgrade bundles into the restoration flow instead of leaving them as quiet balance changes.
+- Added product-aware post-purchase beats for `Gem Pack M/L` and `Season Pass`, steering gem bundles into safer next-level play and the season bundle straight into the live event track.
+- Added a fail-screen gem-pack rescue card and kept gem-pack purchases inside the fail recovery flow, so buying emergency gems no longer kicks players into a generic shop reveal before they can continue.
+- Added a pure fail-rescue gem-pack planner plus transparent fail-card coverage copy, so the player can now see the gem shortfall, the selected pack payout, and the post-continue remainder before buying.
 - Added integration and browser smoke coverage for `dismiss reveal -> map spotlight -> follow-up action`, protecting the softer post-reveal guidance path.
 - Added post-claim spotlight planning for daily, comeback, and event reward flows so the map/reveal surface can ignore stale daily prompts and route players toward the next meaningful restore or play beat.
 - Simplified the map hero when a spotlight is active by suppressing the competing current-goal card and default primary Play CTA, leaving one clearer next-step action after major beats.

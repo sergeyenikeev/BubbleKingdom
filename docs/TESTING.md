@@ -26,6 +26,7 @@ Current unit suites cover:
 - score and economy helpers
 - pre-level starter-booster selection and loadout application
 - fail-offer decisioning and piggy bank presentation thresholds
+- fail-rescue gem-pack planning, including smallest-cover selection and overshoot fallback
 - session-goal derivation, comeback reward planning, and map-surface alert summaries
 - post-claim spotlight planning that can suppress stale daily-reward prompts in favor of restore / level follow-up beats
 - gated event-reward goal surfacing for the post-tutorial map loop
@@ -59,6 +60,7 @@ Current integration suite validates:
 - pre-level briefing open -> select starter boosters -> confirm start
 - fail + rewarded continue
 - fail + gem continue
+- fail + gem-pack rescue purchase that keeps the player on the fail screen and re-enables gem continue
 - shop open + purchase
 - localization switch
 - locale auto-detect on first boot and manual override persistence
@@ -102,7 +104,10 @@ Playwright smoke covers:
 - the shop ad-status card is covered in smoke for `standard -> Ad Light active`, including the direct `Upgrade to No Ads` CTA
 - direct `No Ads` purchase is also covered in smoke, asserting the final ad-free status card and the absence of both permanent ad offers afterward
 - the status-card-led `Ad Light -> No Ads` upgrade flow is also covered in smoke, with the duplicated `No Ads` purchase button removed from the offer grid in favor of a single featured CTA
-- the completed `No Ads` state is covered through its return CTA as well, proving the player can leave the shop cleanly and land back on the map after the permanent purchase
+- the completed `No Ads` state is covered through its direct `Play next level` CTA as well, proving the player can leave the shop cleanly and re-enter the gameplay loop after the permanent purchase
+- `Starter Pack` is covered in smoke as a full `purchase -> reward reveal -> Play next level -> pre-level` flow, and integration tests now assert the same next-level reward reveal contract for both `Starter Pack` and `Welcome Offer`
+- `Booster Pack` is now covered through a `purchase -> reward reveal -> Play next level` smoke path, while `Renovation Pack` is covered through `purchase -> reward reveal -> restoration screen`, with matching integration contracts for both flows
+- `Gem Pack L` is covered in smoke as a `purchase -> fail-safety reward reveal -> Play next level` path, and `Gem Pack M` is asserted in integration with the same reveal contract; `Season Pass` is covered through `purchase -> reward reveal -> event screen` in smoke plus integration
 - pre-level modal appears before gameplay and confirms into the level
 - game canvas and HUD render together
 - shop purchase persists to save storage

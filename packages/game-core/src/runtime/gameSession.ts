@@ -58,6 +58,7 @@ import {
   canClaimChapterChest,
   chapterStarsEarned,
   claimChapterChest,
+  getChapterRestorationProgress,
   restoreNode,
   totalStars,
 } from "../progression/restoration";
@@ -273,6 +274,164 @@ export function createGameSession(input: {
       rewardReveal: reveal,
       mapSpotlight: null,
     });
+  };
+
+  const getNextRestorationPurchaseContext = (save: PlayerSave) => {
+    for (const chapter of chapters) {
+      const progress = getChapterRestorationProgress(save, chapter);
+      if (progress.nextNode) {
+        return {
+          chapter,
+          progress,
+          node: progress.nextNode,
+        };
+      }
+    }
+
+    return null;
+  };
+
+  const planShopPurchaseRewardReveal = (
+    save: PlayerSave,
+    offer: ShopOfferDefinition,
+  ): RewardRevealState | null => {
+    if (offer.type === "starter_pack" || offer.type === "welcome_offer") {
+      return {
+        tagKey: "reward.reveal.shopPurchaseTag",
+        titleKey: offer.titleKey,
+        bodyKey: "reward.reveal.shopPurchaseBody",
+        rewards: offer.rewards,
+        featureHighlight: {
+          tagKey: "reward.reveal.shopPlayTag",
+          titleKey: "goal.level.title",
+          bodyKey: "reward.reveal.shopPlayBody",
+        },
+        primaryAction: {
+          action: "start-current-level",
+          labelKey: "reward.reveal.keepPlaying",
+        },
+      };
+    }
+
+    if (offer.type === "booster_pack") {
+      return {
+        tagKey: "reward.reveal.boosterPurchaseTag",
+        titleKey: offer.titleKey,
+        bodyKey: "reward.reveal.boosterPurchaseBody",
+        rewards: offer.rewards,
+        featureHighlight: {
+          tagKey: "reward.reveal.boosterPlayTag",
+          titleKey: "goal.level.title",
+          bodyKey: "reward.reveal.boosterPlayBody",
+        },
+        primaryAction: {
+          action: "start-current-level",
+          labelKey: "reward.reveal.keepPlaying",
+        },
+      };
+    }
+
+    if (offer.type === "gem_pack" && (offer.id === "gem_pack_m" || offer.id === "gem_pack_l")) {
+      return {
+        tagKey: "reward.reveal.gemPurchaseTag",
+        titleKey: offer.titleKey,
+        bodyKey: "reward.reveal.gemPurchaseBody",
+        rewards: offer.rewards,
+        featureHighlight: {
+          tagKey: "reward.reveal.gemSafetyTag",
+          titleKey: "reward.reveal.gemSafetyTitle",
+          bodyKey: "reward.reveal.gemSafetyBody",
+        },
+        primaryAction: {
+          action: "start-current-level",
+          labelKey: "reward.reveal.keepPlaying",
+        },
+      };
+    }
+
+    if (offer.type === "renovation_pack") {
+      const restorationContext = getNextRestorationPurchaseContext(save);
+
+      if (!restorationContext) {
+        return {
+          tagKey: "reward.reveal.renovationPurchaseTag",
+          titleKey: offer.titleKey,
+          bodyKey: "reward.reveal.renovationPurchaseBody",
+          rewards: offer.rewards,
+          featureHighlight: {
+            tagKey: "reward.reveal.shopPlayTag",
+            titleKey: "goal.level.title",
+            bodyKey: "reward.reveal.shopPlayBody",
+          },
+          primaryAction: {
+            action: "start-current-level",
+            labelKey: "reward.reveal.keepPlaying",
+          },
+        };
+      }
+
+      return {
+        tagKey: "reward.reveal.renovationPurchaseTag",
+        titleKey: offer.titleKey,
+        bodyKey: "reward.reveal.renovationPurchaseBody",
+        rewards: offer.rewards,
+        featureHighlight: {
+          tagKey: restorationContext.progress.nextNodeAffordable
+            ? "reward.reveal.renovationReadyTag"
+            : "reward.reveal.renovationPlanTag",
+          titleKey: restorationContext.node.titleKey,
+          bodyKey: restorationContext.progress.nextNodeAffordable
+            ? "reward.reveal.renovationReadyBody"
+            : "reward.reveal.renovationPlanBody",
+        },
+        primaryAction: {
+          action: "open-screen",
+          id: "restoration",
+          labelKey: "reward.reveal.viewNextRestore",
+        },
+      };
+    }
+
+    if (offer.type === "season_pass") {
+      const activeEvent = getActiveEvent();
+
+      if (activeEvent) {
+        return {
+          tagKey: "reward.reveal.seasonPurchaseTag",
+          titleKey: offer.titleKey,
+          bodyKey: "reward.reveal.seasonPurchaseBody",
+          rewards: offer.rewards,
+          featureHighlight: {
+            tagKey: "reward.reveal.eventSpotlightTag",
+            titleKey: activeEvent.titleKey,
+            bodyKey: activeEvent.descriptionKey,
+          },
+          primaryAction: {
+            action: "open-screen",
+            id: "event",
+            labelKey: "event.viewTrack",
+          },
+        };
+      }
+
+      return {
+        tagKey: "reward.reveal.seasonPurchaseTag",
+        titleKey: offer.titleKey,
+        bodyKey: "reward.reveal.seasonPurchaseBody",
+        rewards: offer.rewards,
+        featureHighlight: {
+          tagKey: "reward.reveal.shopPlayTag",
+          titleKey: "goal.level.title",
+          bodyKey: "reward.reveal.shopPlayBody",
+        },
+        primaryAction: {
+          action: "start-current-level",
+          labelKey: "reward.reveal.keepPlaying",
+        },
+      };
+    }
+
+    return null;
   };
 
   const clearMapSpotlight = () => {
@@ -1362,6 +1521,13 @@ export function createGameSession(input: {
       });
       refreshShopOffers(updated);
       updateTutorialStep(updated);
+      const purchaseReveal =
+        state.currentScreen === "fail" && offer.type === "gem_pack"
+          ? null
+          : planShopPurchaseRewardReveal(updated, offer);
+      if (purchaseReveal) {
+        showRewardReveal(purchaseReveal);
+      }
       await input.platform.analytics.track("iap_success", {
         offerId,
         validationStatus: validation.status,

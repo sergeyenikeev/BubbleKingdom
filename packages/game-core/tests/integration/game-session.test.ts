@@ -412,6 +412,27 @@ describe("game session integration", () => {
     expect(session.getState().leaderboard.length).toBeGreaterThan(0);
   });
 
+  it("shows a next-level reward reveal after buying the starter pack", async () => {
+    const session = createSession();
+    await session.boot();
+    await session.openScreen("shop");
+    await session.purchaseOffer("starter_pack");
+
+    expect(session.getState().rewardReveal?.tagKey).toBe("reward.reveal.shopPurchaseTag");
+    expect(session.getState().rewardReveal?.titleKey).toBe("shop.starter.title");
+    expect(session.getState().rewardReveal?.featureHighlight).toEqual({
+      tagKey: "reward.reveal.shopPlayTag",
+      titleKey: "goal.level.title",
+      bodyKey: "reward.reveal.shopPlayBody",
+    });
+    expect(session.getState().rewardReveal?.primaryAction).toEqual({
+      action: "start-current-level",
+      labelKey: "reward.reveal.keepPlaying",
+    });
+    expect(session.getState().rewardReveal?.rewards?.gems).toBe(120);
+    expect(session.getState().rewardReveal?.rewards?.boosters?.bombOrb).toBe(3);
+  });
+
   it("uses the platform locale on first boot and preserves a manual language override", async () => {
     const logger = createLogger({
       sessionId: "test",
@@ -542,6 +563,139 @@ describe("game session integration", () => {
     await session.purchaseOffer("no_ads");
     expect(session.getState().save.economy.noAdsPurchased).toBe(true);
     expect(session.getState().shopOffers.some((offer) => offer.id === "no_ads")).toBe(false);
+  });
+
+  it("also shows the same next-level reward reveal for the welcome offer", async () => {
+    const session = createSession();
+    await session.boot();
+
+    expect(session.getState().shopOffers.some((offer) => offer.id === "welcome_offer")).toBe(true);
+
+    await session.purchaseOffer("welcome_offer");
+
+    expect(session.getState().rewardReveal?.titleKey).toBe("shop.welcome.title");
+    expect(session.getState().rewardReveal?.tagKey).toBe("reward.reveal.shopPurchaseTag");
+    expect(session.getState().rewardReveal?.primaryAction).toEqual({
+      action: "start-current-level",
+      labelKey: "reward.reveal.keepPlaying",
+    });
+    expect(session.getState().rewardReveal?.rewards?.gems).toBe(70);
+    expect(session.getState().shopOffers.some((offer) => offer.id === "welcome_offer")).toBe(false);
+  });
+
+  it("shows a next-level reward reveal after buying the booster pack", async () => {
+    const session = createSession();
+    await session.boot();
+    await session.openScreen("shop");
+    await session.purchaseOffer("booster_pack");
+
+    expect(session.getState().rewardReveal?.tagKey).toBe("reward.reveal.boosterPurchaseTag");
+    expect(session.getState().rewardReveal?.titleKey).toBe("shop.booster.title");
+    expect(session.getState().rewardReveal?.featureHighlight).toEqual({
+      tagKey: "reward.reveal.boosterPlayTag",
+      titleKey: "goal.level.title",
+      bodyKey: "reward.reveal.boosterPlayBody",
+    });
+    expect(session.getState().rewardReveal?.primaryAction).toEqual({
+      action: "start-current-level",
+      labelKey: "reward.reveal.keepPlaying",
+    });
+    expect(session.getState().rewardReveal?.rewards?.boosters?.precisionAim).toBe(5);
+  });
+
+  it("shows a fail-safety reveal after buying the medium gem pack", async () => {
+    const session = createSession();
+    await session.boot();
+    await session.openScreen("shop");
+    await session.purchaseOffer("gem_pack_m");
+
+    expect(session.getState().rewardReveal?.tagKey).toBe("reward.reveal.gemPurchaseTag");
+    expect(session.getState().rewardReveal?.titleKey).toBe("shop.gems.m.title");
+    expect(session.getState().rewardReveal?.featureHighlight).toEqual({
+      tagKey: "reward.reveal.gemSafetyTag",
+      titleKey: "reward.reveal.gemSafetyTitle",
+      bodyKey: "reward.reveal.gemSafetyBody",
+    });
+    expect(session.getState().rewardReveal?.primaryAction).toEqual({
+      action: "start-current-level",
+      labelKey: "reward.reveal.keepPlaying",
+    });
+    expect(session.getState().rewardReveal?.rewards?.gems).toBe(180);
+  });
+
+  it("keeps the fail flow active when a gem pack is purchased as a recovery rescue", async () => {
+    const session = createSession();
+    await session.boot();
+    session.getState().save.currencies.gems = 0;
+    session.getState().save.economy.rewardedViews = 4;
+    await session.startLevel(24);
+
+    const active = session.getState().activeLevel;
+    if (!active) {
+      throw new Error("Expected active level");
+    }
+    active.board.movesRemaining = 1;
+    active.board.cells = [
+      [null, null, null, null, null, null, null, null],
+      [null, null, null, null, null, null, null, null],
+      [null, null, null, null, null, null, null, null],
+      [null, null, null, null, null, null, null, null],
+      [null, null, null, null, null, null, null, null],
+      [null, null, null, null, null, null, null, null],
+    ];
+    active.board.queue = ["ruby"];
+
+    await session.fireShot(-1.1);
+    expect(session.getState().currentScreen).toBe("fail");
+
+    await session.purchaseOffer("gem_pack_s");
+
+    expect(session.getState().currentScreen).toBe("fail");
+    expect(session.getState().rewardReveal).toBeNull();
+    expect(session.getState().save.currencies.gems).toBe(75);
+
+    const continued = await session.continueWithGems();
+    expect(continued).toBe(true);
+    expect(session.getState().currentScreen).toBe("level");
+  });
+
+  it("shows a restoration follow-up reveal after buying the renovation pack", async () => {
+    const session = createSession();
+    await session.boot();
+    await session.openScreen("shop");
+    await session.purchaseOffer("renovation_pack");
+
+    expect(session.getState().rewardReveal?.tagKey).toBe("reward.reveal.renovationPurchaseTag");
+    expect(session.getState().rewardReveal?.titleKey).toBe("shop.renovation.title");
+    expect(session.getState().rewardReveal?.primaryAction).toEqual({
+      action: "open-screen",
+      id: "restoration",
+      labelKey: "reward.reveal.viewNextRestore",
+    });
+    expect(session.getState().rewardReveal?.featureHighlight?.tagKey).toBe(
+      "reward.reveal.renovationPlanTag",
+    );
+    expect(session.getState().rewardReveal?.rewards?.gold).toBe(1500);
+    expect(session.getState().rewardReveal?.rewards?.petals).toBe(120);
+  });
+
+  it("shows an event follow-up reveal after buying the season pass", async () => {
+    const session = createSession();
+    await session.boot();
+    await session.openScreen("shop");
+    await session.purchaseOffer("season_pass");
+
+    expect(session.getState().rewardReveal?.tagKey).toBe("reward.reveal.seasonPurchaseTag");
+    expect(session.getState().rewardReveal?.titleKey).toBe("shop.season.title");
+    expect(session.getState().rewardReveal?.featureHighlight?.titleKey).toBe(
+      liveEvents[0]!.titleKey,
+    );
+    expect(session.getState().rewardReveal?.primaryAction).toEqual({
+      action: "open-screen",
+      id: "event",
+      labelKey: "event.viewTrack",
+    });
+    expect(session.getState().rewardReveal?.rewards?.seasonalTokens).toBe(120);
   });
 
   it("keeps interstitials active after ad light while suppressing sticky banners", async () => {

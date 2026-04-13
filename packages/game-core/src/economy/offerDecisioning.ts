@@ -7,6 +7,17 @@ import { calculateExtraMovesGemCost, calculatePiggyBankBonusGems } from "./econo
 export type FailOfferVariant = "rewarded_primary" | "gems_primary" | "piggy_primary";
 export type FailOfferAction = "rewarded_continue" | "gems_continue" | "piggy_bank";
 
+export interface FailRescueGemOfferPlan {
+  offerId: string;
+  gemsGranted: number;
+  currentGems: number;
+  gemContinueCost: number;
+  shortfall: number;
+  gemsAfterPurchase: number;
+  leftoverAfterContinue: number;
+  coversContinue: boolean;
+}
+
 export interface PiggyBankPresentation {
   offerId: string;
   fillRatio: number;
@@ -133,6 +144,51 @@ export function decideFailOffer(input: {
     piggyBank,
     headlineKey: "fail.offer.rewarded.title",
     bodyKey: "fail.offer.rewarded.body",
+  };
+}
+
+export function planFailRescueGemOffer(input: {
+  save: PlayerSave;
+  gemContinueCost: number;
+  shopOffers: Array<Pick<ShopOfferDefinition, "id" | "type" | "rewards">>;
+}): FailRescueGemOfferPlan | null {
+  const currentGems = input.save.currencies.gems;
+  if (currentGems >= input.gemContinueCost) {
+    return null;
+  }
+
+  const shortfall = input.gemContinueCost - currentGems;
+  const gemOffers = input.shopOffers
+    .filter(
+      (offer) =>
+        offer.type === "gem_pack" &&
+        typeof offer.rewards.gems === "number" &&
+        (offer.rewards.gems ?? 0) > 0,
+    )
+    .sort((left, right) => (left.rewards.gems ?? 0) - (right.rewards.gems ?? 0));
+
+  const chosen =
+    gemOffers.find((offer) => (offer.rewards.gems ?? 0) >= shortfall) ??
+    gemOffers[gemOffers.length - 1] ??
+    null;
+
+  if (!chosen) {
+    return null;
+  }
+
+  const gemsGranted = chosen.rewards.gems ?? 0;
+  const gemsAfterPurchase = currentGems + gemsGranted;
+  const coversContinue = gemsAfterPurchase >= input.gemContinueCost;
+
+  return {
+    offerId: chosen.id,
+    gemsGranted,
+    currentGems,
+    gemContinueCost: input.gemContinueCost,
+    shortfall,
+    gemsAfterPurchase,
+    leftoverAfterContinue: Math.max(0, gemsAfterPurchase - input.gemContinueCost),
+    coversContinue,
   };
 }
 

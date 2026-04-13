@@ -15,6 +15,7 @@ import {
   decideFailOffer,
   deriveSessionGoal,
   getEventProgressSummary,
+  planFailRescueGemOffer,
   getChapterRestorationProgress,
   getPiggyBankPresentation,
   isPreLevelBoosterSelected,
@@ -948,6 +949,20 @@ function renderOverlay(
             state.remoteConfig,
           )
         : 0);
+    const showPiggyUpsell = Boolean(
+      failDecision?.piggyBank?.isNudged && failDecision.primaryAction !== "piggy_bank",
+    );
+    const failRescueGemOffer =
+      failDecision &&
+      !failDecision.hasEnoughGems &&
+      failDecision.primaryAction !== "piggy_bank" &&
+      !showPiggyUpsell
+        ? planFailRescueGemOffer({
+            save: state.save,
+            gemContinueCost,
+            shopOffers: state.shopOffers,
+          })
+        : null;
     const alternativeActions = [
       failDecision?.primaryAction === "rewarded_continue"
         ? ""
@@ -958,7 +973,7 @@ function renderOverlay(
     ]
       .filter(Boolean)
       .join("");
-    return `<div class="overlay-modal"><div class="panel modal-card fail-modal"><div class="panel-actions"><span class="tag">${t("level.fail")}</span><span class="tag">${t("ui.score")} ${board?.score ?? 0}</span>${failDecision ? `<span class="tag tag-accent">${t("ui.recommended")}</span>` : ""}</div><h2>${failDecision ? t(failDecision.headlineKey) : t("level.failFlavor")}</h2><p class="small fail-copy">${failDecision ? t(failDecision.bodyKey) : t("level.failFlavor")}</p>${renderFailOverlayFocusCard(state, failDecision, gemContinueCost, t)}${renderRemainingObjective(state, t)}${alternativeActions ? `<div class="cta-row cta-row-stacked">${alternativeActions}</div>` : ""}${failDecision?.piggyBank?.isNudged && failDecision.primaryAction !== "piggy_bank" ? renderPiggyBankUpsellCard(state, failDecision, t) : ""}<div class="cta-row"><button class="ghost-btn" data-action="restart-level">${t("level.retry")}</button><button class="ghost-btn" data-action="acknowledge-level">${t("screen.map")}</button></div></div></div>`;
+    return `<div class="overlay-modal"><div class="panel modal-card fail-modal"><div class="panel-actions"><span class="tag">${t("level.fail")}</span><span class="tag">${t("ui.score")} ${board?.score ?? 0}</span>${failDecision ? `<span class="tag tag-accent">${t("ui.recommended")}</span>` : ""}</div><h2>${failDecision ? t(failDecision.headlineKey) : t("level.failFlavor")}</h2><p class="small fail-copy">${failDecision ? t(failDecision.bodyKey) : t("level.failFlavor")}</p>${renderFailOverlayFocusCard(state, failDecision, gemContinueCost, t)}${renderRemainingObjective(state, t)}${alternativeActions ? `<div class="cta-row cta-row-stacked">${alternativeActions}</div>` : ""}${showPiggyUpsell && failDecision ? renderPiggyBankUpsellCard(state, failDecision, t) : ""}${failRescueGemOffer ? renderFailGemRescueCard(failRescueGemOffer, state.shopOffers.find((offer) => offer.id === failRescueGemOffer.offerId) ?? null, t) : ""}<div class="cta-row"><button class="ghost-btn" data-action="restart-level">${t("level.retry")}</button><button class="ghost-btn" data-action="acknowledge-level">${t("screen.map")}</button></div></div></div>`;
   }
 
   return `<div class="overlay-modal"><div class="panel modal-card">${renderModalContent(
@@ -1033,6 +1048,30 @@ function renderFailOverlayFocusCard(
   }
 
   return `<div class="reward-highlight-card overlay-focus-card"><div class="panel-actions"><span class="tag tag-accent">${t("ui.nextStep")}</span><span class="tag">${t("reward.watchAdContinue")}</span><span class="tag tag-accent">${t("ui.recommended")}</span></div><strong>${t("fail.offer.rewarded.title")}</strong><div class="small">${t("fail.offer.rewarded.body")}</div><div class="cta-row"><button class="primary-btn" data-action="continue-rewarded">${t("reward.watchAdContinue")}</button></div></div>`;
+}
+
+function renderFailGemRescueCard(
+  rescuePlan: NonNullable<ReturnType<typeof planFailRescueGemOffer>>,
+  offer: GameSessionState["shopOffers"][number] | null,
+  t: (key: string) => string,
+) {
+  if (!offer) {
+    return "";
+  }
+  const resolvedOffer = offer;
+  const gemContinueCost = rescuePlan.gemContinueCost;
+  const badge = offer.badgeKey ? `<span class="tag">${t(offer.badgeKey)}</span>` : "";
+  const safeCoverageLine = `${t("ui.missing")} ${rescuePlan.shortfall} ${t("currency.gems")} &middot; ${t("fail.offer.gemPack.grants")} ${rescuePlan.gemsGranted} ${t("currency.gems")}`;
+  const safeFollowUpLine = rescuePlan.coversContinue
+    ? `${t("fail.offer.gemPack.covers")} &middot; ${t("fail.offer.gemPack.leftover")} ${rescuePlan.leftoverAfterContinue} ${t("currency.gems")}`
+    : `${t("fail.offer.gemPack.stillShort")} ${Math.max(0, gemContinueCost - rescuePlan.gemsAfterPurchase)} ${t("currency.gems")}`;
+  const coverageLine = `${t("ui.missing")} ${rescuePlan.shortfall} ${t("currency.gems")} · ${t("fail.offer.gemPack.grants")} ${rescuePlan.gemsGranted} ${t("currency.gems")}`;
+  const followUpLine = rescuePlan.coversContinue
+    ? `${t("fail.offer.gemPack.covers")} · ${t("fail.offer.gemPack.leftover")} ${rescuePlan.leftoverAfterContinue} ${t("currency.gems")}`
+    : `${t("fail.offer.gemPack.stillShort")} ${Math.max(0, gemContinueCost - rescuePlan.gemsAfterPurchase)} ${t("currency.gems")}`;
+  void coverageLine;
+  void followUpLine;
+  return `<div class="offer-card fail-offer-card" data-offer-id="${resolvedOffer.id}"><div class="panel-actions"><strong>${t(resolvedOffer.titleKey)}</strong>${badge}</div><div class="small">${t(resolvedOffer.descriptionKey)}</div><div class="small">${safeCoverageLine}</div><div class="small">${safeFollowUpLine}</div><div class="small">${renderOfferRewards(resolvedOffer, t)}</div><div class="panel-actions"><span class="small">${resolvedOffer.platformPriceLabel}</span><button class="secondary-btn" data-action="purchase-offer" data-id="${resolvedOffer.id}">${t("shop.buy")}</button></div></div>`;
 }
 
 function renderRewardRevealFocusCard(state: GameSessionState, t: (key: string) => string) {
@@ -1428,7 +1467,7 @@ function renderShopAdStatusCard(state: GameSessionState, t: (key: string) => str
       : "";
   const completionCta =
     mode === "no_ads"
-      ? `<div class="cta-row"><button class="primary-btn" data-action="open-screen" data-id="map">${t("shop.adStatus.returnCta")}</button></div>`
+      ? `<div class="cta-row"><button class="primary-btn" data-action="start-current-level">${t("shop.adStatus.resumeCta")}</button></div>`
       : "";
 
   return `<section class="panel shop-status-card ${mode === "no_ads" ? "is-complete" : mode === "ad_light" ? "is-upgraded" : ""}" data-shop-status-mode="${mode}"><div class="panel-actions"><span class="tag">${t("shop.adStatus.title")}</span><span class="tag ${mode === "standard" ? "" : "tag-accent"}">${t(titleKey)}</span></div><strong>${t(titleKey)}</strong><div class="small">${t(bodyKey)}</div><div class="offer-benefit-grid">${benefitRows

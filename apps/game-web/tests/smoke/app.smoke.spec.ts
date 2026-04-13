@@ -115,6 +115,42 @@ test("piggy-primary fail flow pivots into gem continue after breaking the piggy 
   await expect(page.locator(".overlay-modal")).toHaveCount(0);
 });
 
+test("fail overlay can sell a small gem rescue pack without leaving the recovery flow", async ({
+  page,
+}) => {
+  await openDebugShell(page);
+  await seedDebugFailProfile(page, {
+    levelId: 24,
+    gems: 0,
+    rewardedViews: 4,
+    piggyBankGold: 0,
+    failVariant: "gems_primary",
+  });
+  await page.reload();
+  await expect(page.locator(".brand-title")).toBeVisible();
+  await dismissDailyReward(page);
+  await forceDebugFail(page, 24);
+
+  await expect(page.locator(".overlay-focus-card")).toContainText("Watch Ad + Moves");
+  const rescueCard = page.locator('.fail-offer-card[data-offer-id="gem_pack_s"]');
+  await expect(rescueCard).toContainText("Gem Pack S");
+  await expect(rescueCard).toContainText("Need 12 Gems");
+  await expect(rescueCard).toContainText("Pack grants 75 Gems");
+  await expect(rescueCard).toContainText("Left after continue 63 Gems");
+  await rescueCard.locator('[data-action="purchase-offer"][data-id="gem_pack_s"]').click();
+
+  await expect(page.locator(".reward-reveal-modal")).toHaveCount(0);
+  await expect(page.locator(".fail-modal")).toBeVisible();
+  await expect(page.locator(".overlay-focus-card")).toContainText("Continue for 12 Gems");
+  await expect(page.locator('.overlay-focus-card [data-action="continue-gems"]')).toHaveCount(1);
+  await expect(page.locator('.fail-offer-card[data-offer-id="gem_pack_s"]')).toHaveCount(0);
+
+  await page.click('.overlay-focus-card [data-action="continue-gems"]');
+
+  await expect(page.locator(".level-hud")).toBeVisible();
+  await expect(page.locator(".overlay-modal")).toHaveCount(0);
+});
+
 test("shop keeps no ads visible after buying ad light while removing the lighter offer", async ({
   page,
 }) => {
@@ -170,7 +206,7 @@ test("direct no ads purchase switches the shop into a completed ad-free status",
 
   const statusCard = page.locator(".shop-status-card");
   await expect(statusCard).toContainText("No Ads active");
-  await expect(statusCard).toContainText("Back to kingdom");
+  await expect(statusCard).toContainText("Play next level");
   await expect(statusCard).not.toContainText("Upgrade to No Ads");
   await expect(page.locator('[data-action="purchase-offer"][data-id="no_ads"]')).toHaveCount(0);
   await expect(page.locator('[data-action="purchase-offer"][data-id="ad_light"]')).toHaveCount(0);
@@ -196,9 +232,12 @@ test("direct no ads purchase switches the shop into a completed ad-free status",
       noAdsPurchased: true,
     });
 
-  await statusCard.locator('[data-action="open-screen"][data-id="map"]').click();
-  await expect(page.locator(".hero-panel")).toBeVisible();
-  await expect(page.locator(".shop-status-card")).toHaveCount(0);
+  await statusCard.locator('[data-action="start-current-level"]').click();
+  await expect(page.locator(".prelevel-modal")).toBeVisible();
+  await expect(page.locator(".prelevel-modal")).toContainText("Play 1");
+  await page.click('[data-action="confirm-start-level"]');
+  await expect(page.locator(".level-hud")).toBeVisible();
+  await expect(page.locator(".overlay-modal")).toHaveCount(0);
 });
 
 test("ad light upgrade CTA on the status card completes the no ads purchase", async ({
@@ -216,6 +255,7 @@ test("ad light upgrade CTA on the status card completes the no ads purchase", as
 
   await expect(statusCard).toHaveAttribute("data-shop-status-mode", "no_ads");
   await expect(statusCard).toContainText("No Ads active");
+  await expect(statusCard).toContainText("Play next level");
   await expect(statusCard.locator('[data-action="purchase-offer"]')).toHaveCount(0);
   await expect(page.locator('.offer-card[data-offer-id="no_ads"]')).toHaveCount(0);
 });
@@ -385,13 +425,22 @@ test("inbox screen keeps the comeback reward highlighted as the recommended clai
   await expect(page.locator('.overlay-focus-card [data-action="open-screen"][data-id="map"]')).toHaveCount(1);
 });
 
-test("opens the shop and persists a mock purchase to save storage", async ({ page }) => {
+test("starter pack purchase lifts a reward reveal that returns the player to the next level", async ({
+  page,
+}) => {
   await dismissDailyReward(page);
 
   await page.click('[data-action="open-screen"][data-id="shop"]');
-  await expect(page.locator('[data-action="purchase-offer"]').first()).toBeVisible();
+  const starterPack = page.locator('.offer-card[data-offer-id="starter_pack"]');
+  await expect(starterPack).toBeVisible();
 
-  await page.locator('[data-action="purchase-offer"]').first().click();
+  await starterPack.locator('[data-action="purchase-offer"][data-id="starter_pack"]').click();
+
+  await expect(page.locator(".reward-reveal-modal")).toContainText("Starter Pack");
+  await expect(page.locator(".reward-reveal-modal")).toContainText("120 Gems");
+  await expect(page.locator(".reward-reveal-modal")).toContainText("3 Bomb");
+  await expect(page.locator(".overlay-focus-card")).toContainText("Play next level");
+  await expect(page.locator('.overlay-focus-card [data-action="reward-reveal-primary"]')).toHaveCount(1);
 
   await expect
     .poll(async () => {
@@ -408,6 +457,86 @@ test("opens the shop and persists a mock purchase to save storage", async ({ pag
       });
     })
     .not.toBeNull();
+
+  await page.click('.overlay-focus-card [data-action="reward-reveal-primary"]');
+  await expect(page.locator(".prelevel-modal")).toBeVisible();
+  await expect(page.locator(".prelevel-modal")).toContainText("Play 1");
+});
+
+test("booster pack purchase highlights the next level as the immediate follow-up", async ({
+  page,
+}) => {
+  await dismissDailyReward(page);
+
+  await page.click('[data-action="open-screen"][data-id="shop"]');
+  const boosterPack = page.locator('.offer-card[data-offer-id="booster_pack"]');
+  await expect(boosterPack).toBeVisible();
+
+  await boosterPack.locator('[data-action="purchase-offer"][data-id="booster_pack"]').click();
+
+  await expect(page.locator(".reward-reveal-modal")).toContainText("Booster Crate");
+  await expect(page.locator(".reward-reveal-modal")).toContainText("5 Aim");
+  await expect(page.locator(".overlay-focus-card")).toContainText("Play next level");
+
+  await page.click('.overlay-focus-card [data-action="reward-reveal-primary"]');
+  await expect(page.locator(".prelevel-modal")).toBeVisible();
+  await expect(page.locator(".prelevel-modal")).toContainText("Play 1");
+});
+
+test("large gem pack purchase frames the next level as a safer recovery run", async ({ page }) => {
+  await dismissDailyReward(page);
+
+  await page.click('[data-action="open-screen"][data-id="shop"]');
+  const gemPack = page.locator('.offer-card[data-offer-id="gem_pack_l"]');
+  await expect(gemPack).toBeVisible();
+
+  await gemPack.locator('[data-action="purchase-offer"][data-id="gem_pack_l"]').click();
+
+  await expect(page.locator(".reward-reveal-modal")).toContainText("Gem Pack L");
+  await expect(page.locator(".reward-reveal-modal")).toContainText("420 Gems");
+  await expect(page.locator(".reward-reveal-modal")).toContainText("Recovery gems are ready");
+  await expect(page.locator(".overlay-focus-card")).toContainText("Play next level");
+
+  await page.click('.overlay-focus-card [data-action="reward-reveal-primary"]');
+  await expect(page.locator(".prelevel-modal")).toBeVisible();
+  await expect(page.locator(".prelevel-modal")).toContainText("Play 1");
+});
+
+test("renovation pack purchase pivots the player into restoration planning", async ({ page }) => {
+  await dismissDailyReward(page);
+
+  await page.click('[data-action="open-screen"][data-id="shop"]');
+  const renovationPack = page.locator('.offer-card[data-offer-id="renovation_pack"]');
+  await expect(renovationPack).toBeVisible();
+
+  await renovationPack.locator('[data-action="purchase-offer"][data-id="renovation_pack"]').click();
+
+  await expect(page.locator(".reward-reveal-modal")).toContainText("Renovation Pack");
+  await expect(page.locator(".reward-reveal-modal")).toContainText("1500 Gold");
+  await expect(page.locator(".reward-reveal-modal")).toContainText("120 Petals");
+  await expect(page.locator(".overlay-focus-card")).toContainText("Plan next restore");
+
+  await page.click('.overlay-focus-card [data-action="reward-reveal-primary"]');
+  await expect(page.locator(".restoration-progress-card")).toBeVisible();
+  await expect(page.locator(".restoration-card").first()).toBeVisible();
+});
+
+test("season pass purchase pivots the player into the live event track", async ({ page }) => {
+  await dismissDailyReward(page);
+
+  await page.click('[data-action="open-screen"][data-id="shop"]');
+  const seasonPass = page.locator('.offer-card[data-offer-id="season_pass"]');
+  await expect(seasonPass).toBeVisible();
+
+  await seasonPass.locator('[data-action="purchase-offer"][data-id="season_pass"]').click();
+
+  await expect(page.locator(".reward-reveal-modal")).toContainText("Season Pass");
+  await expect(page.locator(".reward-reveal-modal")).toContainText("Spring Blossom Festival");
+  await expect(page.locator(".reward-reveal-modal")).toContainText("View Event");
+
+  await page.click('.overlay-focus-card [data-action="reward-reveal-primary"]');
+  await expect(page.locator(".modal-card")).toContainText("Spring Blossom Festival");
+  await expect(page.locator(".event-milestone-card").first()).toBeVisible();
 });
 
 test("switches language in settings and updates visible UI copy", async ({ page }) => {

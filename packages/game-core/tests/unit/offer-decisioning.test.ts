@@ -4,6 +4,7 @@ import { defaultRemoteConfig } from "../../../config/src/index";
 import {
   decideFailOffer,
   getPiggyBankPresentation,
+  planFailRescueGemOffer,
 } from "../../src/economy/offerDecisioning";
 import { createDefaultSave } from "../../src/save/schema";
 
@@ -79,5 +80,41 @@ describe("offer decisioning", () => {
 
     expect(presentation?.fillPercent).toBe(50);
     expect(presentation?.bonusGems).toBeGreaterThan(0);
+  });
+
+  it("chooses the smallest gem pack that fully covers a fail rescue", () => {
+    const save = createSave();
+    save.currencies.gems = 0;
+
+    const rescue = planFailRescueGemOffer({
+      save,
+      gemContinueCost: 12,
+      shopOffers: [
+        { id: "gem_pack_s", type: "gem_pack", rewards: { source: "purchase", gems: 75 } },
+        { id: "gem_pack_m", type: "gem_pack", rewards: { source: "purchase", gems: 180 } },
+      ],
+    });
+
+    expect(rescue?.offerId).toBe("gem_pack_s");
+    expect(rescue?.coversContinue).toBe(true);
+    expect(rescue?.leftoverAfterContinue).toBe(63);
+  });
+
+  it("falls back to the largest available gem pack if none can fully cover the shortfall", () => {
+    const save = createSave();
+    save.currencies.gems = 1;
+
+    const rescue = planFailRescueGemOffer({
+      save,
+      gemContinueCost: 120,
+      shopOffers: [
+        { id: "gem_pack_s", type: "gem_pack", rewards: { source: "purchase", gems: 20 } },
+        { id: "gem_pack_m", type: "gem_pack", rewards: { source: "purchase", gems: 40 } },
+      ],
+    });
+
+    expect(rescue?.offerId).toBe("gem_pack_m");
+    expect(rescue?.coversContinue).toBe(false);
+    expect(rescue?.gemsAfterPurchase).toBe(41);
   });
 });
