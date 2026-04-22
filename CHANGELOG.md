@@ -69,6 +69,8 @@ The project follows Semantic Versioning and Conventional Commits.
 - Reduced overlay CTA competition when a `screenSpotlight` is present: destination overlays now demote their actionable focus card into a companion state instead of presenting two equally strong “next step” blocks at once.
 - Added return-trip continuity for `screenSpotlight`: if the player checks `event` or `restoration` and backs out without acting, that follow-up now restores itself to the map hero instead of silently disappearing.
 - Hardened local Playwright smoke runs by moving them onto a dedicated preview port and disabling arbitrary server reuse, so browser regression tests always exercise Bubble Kingdom instead of any unrelated preview already running on the machine.
+- Added an event-overlay fallback CTA for non-claimable season progress, so `Season Pass` follow-ups can push the player back into the next level instead of stopping at a purely descriptive event card.
+- Added a restoration-overlay fallback CTA for unaffordable upgrades, so shortage states now hand the player straight into `Play next level` instead of ending on a passive upgrade dead-end.
 - Added post-claim spotlight planning for daily, comeback, and event reward flows so the map/reveal surface can ignore stale daily prompts and route players toward the next meaningful restore or play beat.
 - Simplified the map hero when a spotlight is active by suppressing the competing current-goal card and default primary Play CTA, leaving one clearer next-step action after major beats.
 - Deduplicated map action-digest chips against active spotlights, so chapter chest, event, and quest follow-up beats no longer echo the same prompt twice in the hero shell.

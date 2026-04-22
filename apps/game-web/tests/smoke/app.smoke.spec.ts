@@ -661,7 +661,8 @@ test("renovation pack purchase pivots the player into restoration planning", asy
   await expect(page.locator(".restoration-progress-card")).toBeVisible();
   await expect(page.locator(".screen-spotlight-card")).toContainText("Royal Gardens");
   await expect(page.locator(".screen-spotlight-card")).toContainText("Next landmark");
-  await expect(page.locator(".overlay-focus-card.is-secondary-focus")).toContainText("Royal Gardens");
+  await expect(page.locator(".overlay-focus-card.is-secondary-focus")).toContainText("Earn the missing resources");
+  await expect(page.locator(".overlay-focus-card.is-secondary-focus")).toContainText("Play next level");
   await expect(page.locator(".restoration-card").first()).toBeVisible();
 
   await page.click('.modal-card [data-action="open-screen"][data-id="map"]');
@@ -687,13 +688,16 @@ test("season pass purchase pivots the player into the live event track", async (
   await expect(page.locator(".modal-card")).toContainText("Spring Blossom Festival");
   await expect(page.locator(".screen-spotlight-card")).toContainText("Spring Blossom Festival");
   await expect(page.locator(".screen-spotlight-card")).toContainText("Event spotlight");
-  await expect(page.locator(".overlay-focus-card.is-secondary-focus")).toHaveCount(0);
-  await expect(page.locator(".event-milestone-card").first()).toBeVisible();
-
+  await expect(page.locator(".overlay-focus-card.is-secondary-focus")).toContainText("Play next level");
+  await expect(page.locator(".overlay-focus-card.is-secondary-focus")).toContainText("Next reward:");
   await page.click('.modal-card [data-action="open-screen"][data-id="map"]');
   await expect(page.locator(".spotlight-card")).toContainText("Spring Blossom Festival");
   await expect(page.locator(".spotlight-card")).toContainText("Event spotlight");
   await expect(page.locator('.spotlight-card [data-action="open-screen"][data-id="event"]')).toBeVisible();
+  await page.click('.spotlight-card [data-action="open-screen"][data-id="event"]');
+  await expect(page.locator(".screen-spotlight-card")).toContainText("Spring Blossom Festival");
+  await page.click('.overlay-focus-card.is-secondary-focus [data-action="start-current-level"]');
+  await expect(page.locator(".prelevel-modal")).toBeVisible();
 });
 
 test("switches language in settings and updates visible UI copy", async ({ page }) => {
@@ -836,6 +840,37 @@ test("restoration overlay lifts the recommended upgrade into a single focus CTA"
   await expect(page.locator('.overlay-focus-card [data-action="restore-node"]')).toHaveCount(1);
   await expect(page.locator(".restoration-card.is-highlighted")).toContainText("Featured above");
   await expect(page.locator('.restoration-card.is-highlighted [data-action="restore-node"]')).toHaveCount(0);
+});
+
+test("restoration overlay sends the player back into gameplay when the upgrade is not affordable", async ({ page }) => {
+  await dismissDailyReward(page);
+
+  await page.evaluate(() => {
+    const raw = window.localStorage.getItem("bubble-kingdom:save");
+    if (!raw) {
+      throw new Error("Expected save to exist before seeding restoration fallback test.");
+    }
+
+    const save = JSON.parse(raw) as {
+      currencies: { gold: number; petals: number };
+      progression: { starsByLevel: Record<string, number>; lastDailyRewardAt: string | null; dailyRewardDay: number };
+    };
+    save.currencies.gold = 0;
+    save.currencies.petals = 0;
+    save.progression.lastDailyRewardAt = new Date().toISOString();
+    save.progression.dailyRewardDay = 1;
+    save.progression.starsByLevel["1"] = 3;
+    save.progression.starsByLevel["2"] = 3;
+    window.localStorage.setItem("bubble-kingdom:save", JSON.stringify(save));
+  });
+
+  await page.reload();
+  await page.click('[data-action="open-screen"][data-id="restoration"]');
+  const restorationFocusCard = page.locator(".overlay-focus-card").filter({ hasText: "Earn the missing resources" });
+  await expect(restorationFocusCard).toContainText("Play next level");
+  await expect(restorationFocusCard.locator('[data-action="restore-node"]')).toHaveCount(0);
+  await restorationFocusCard.locator('[data-action="start-current-level"]').click();
+  await expect(page.locator(".prelevel-modal")).toBeVisible();
 });
 
 test("chapter chest follow-up persists on the map until the player opens the featured event", async ({ page }) => {

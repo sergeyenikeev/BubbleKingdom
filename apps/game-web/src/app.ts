@@ -774,15 +774,20 @@ function renderEventOverlayFocusCard(
   recommendedMilestoneId: string | null,
   t: (key: string) => string,
 ) {
+  const progress = getEventProgressSummary(state.save, event);
   if (recommendedMilestoneId) {
     const milestone = event.rewardTrack.find((item) => item.id === recommendedMilestoneId);
     if (!milestone) {
       return renderOverlayMapReturnCard(state, t);
     }
 
-    const progress = getEventProgressSummary(state.save, event);
     const companionFocus = state.screenSpotlight?.screenId === "event";
     return `<div class="reward-highlight-card overlay-focus-card ${companionFocus ? "is-secondary-focus" : ""}"><div class="panel-actions"><span class="tag tag-accent">${t(companionFocus ? "ui.featuredAbove" : "ui.nextStep")}</span><span class="tag">${milestone.tokenCost} ${t("currency.seasonalTokens")}</span><span class="tag tag-accent">${t("ui.recommended")}</span></div><strong>${t(milestone.titleKey)}</strong><div class="small">${t(milestone.descriptionKey)}</div><div class="small">${t("event.claimReady")} ${t(milestone.titleKey)}</div><div class="small">${formatRewardSummary(milestone.rewards, t)}</div><div class="small">${progress.tokens}/${milestone.tokenCost} ${t("currency.seasonalTokens")}</div><div class="cta-row"><button class="primary-btn" data-action="claim-event-reward" data-id="${milestone.id}">${t("event.claim")}</button></div></div>`;
+  }
+
+  if (state.screenSpotlight?.screenId === "event") {
+    const nextMilestone = progress.nextMilestone;
+    return `<div class="reward-highlight-card overlay-focus-card is-secondary-focus"><div class="panel-actions"><span class="tag tag-accent">${t("ui.featuredAbove")}</span><span class="tag">${t("currency.seasonalTokens")}</span><span class="tag tag-accent">${t("ui.recommended")}</span></div><strong>${t("event.followup.playTitle")}</strong><div class="small">${t("event.followup.playBody")}</div>${nextMilestone ? `<div class="small">${t("event.nextReward")} ${t(nextMilestone.titleKey)}</div><div class="small">${progress.tokens}/${nextMilestone.tokenCost} ${t("currency.seasonalTokens")}</div>` : ""}<div class="cta-row"><button class="primary-btn" data-action="start-current-level">${t("reward.reveal.keepPlaying")}</button></div></div>`;
   }
 
   return renderOverlayMapReturnCard(state, t);
@@ -802,13 +807,14 @@ function renderRestorationOverlayFocusCard(
 
     const restored = state.save.progression.restoredNodes.includes(node.id);
     const affordable = canRestoreNode(state.save, node);
+    const shortfall = !restored && !affordable ? formatRestoreNodeShortfall(state.save, node, t) : "";
     const cta = restored
       ? `<button class="ghost-btn" data-action="open-screen" data-id="map">${t("screen.map")}</button>`
       : affordable
         ? `<button class="primary-btn" data-action="restore-node" data-id="${node.id}">${t("map.restore")}</button>`
-        : `<button class="secondary-btn" data-action="open-screen" data-id="map">${t("screen.map")}</button>`;
+        : `<button class="primary-btn" data-action="start-current-level">${t("reward.reveal.keepPlaying")}</button>`;
     const companionFocus = state.screenSpotlight?.screenId === "restoration";
-    return `<div class="reward-highlight-card overlay-focus-card ${companionFocus ? "is-secondary-focus" : ""}"><div class="panel-actions"><span class="tag tag-accent">${t(companionFocus ? "ui.featuredAbove" : "ui.nextStep")}</span><span class="tag">${t("screen.restore")}</span><span class="tag tag-accent">${t("ui.recommended")}</span></div><strong>${t(node.titleKey)}</strong><div class="small">${t(node.descriptionKey)}</div><div class="small">&#9733; ${node.starCost} &middot; Gold ${node.goldCost} &middot; Petals ${node.petalsCost}</div>${!restored && !affordable ? `<div class="small">${formatRestoreNodeShortfall(state.save, node, t)}</div>` : ""}<div class="cta-row">${cta}</div></div>`;
+    return `<div class="reward-highlight-card overlay-focus-card ${companionFocus ? "is-secondary-focus" : ""}"><div class="panel-actions"><span class="tag tag-accent">${t(companionFocus ? "ui.featuredAbove" : "ui.nextStep")}</span><span class="tag">${t("screen.restore")}</span><span class="tag tag-accent">${t("ui.recommended")}</span></div><strong>${t(affordable || restored ? node.titleKey : "restoration.followup.playTitle")}</strong><div class="small">${t(affordable || restored ? node.descriptionKey : "restoration.followup.playBody")}</div><div class="small">&#9733; ${node.starCost} &middot; Gold ${node.goldCost} &middot; Petals ${node.petalsCost}</div>${shortfall ? `<div class="small">${shortfall}</div>` : ""}<div class="cta-row">${cta}</div></div>`;
   }
 
   return renderOverlayMapReturnCard(state, t);

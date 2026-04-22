@@ -111,6 +111,8 @@ Playwright smoke covers:
 - `Gem Pack L` is covered in smoke as a `purchase -> fail-safety reward reveal -> Play next level` path, and `Gem Pack M` is asserted in integration with the same reveal contract; `Season Pass` is covered through `purchase -> reward reveal -> event screen` in smoke plus integration
 - `Renovation Pack` and `Season Pass` now also prove `overlay -> back to map -> spotlight restored`, so open-screen monetization follow-ups do not vanish when the player checks the destination and returns without acting
 - Playwright smoke now boots on its own dedicated preview port with server reuse disabled, preventing false negatives from unrelated local preview servers on the same machine
+- `Season Pass` smoke now also asserts the in-event fallback `Play next level` CTA for non-claimable progress, proving the event overlay can hand the player back into gameplay instead of ending on a passive explainer
+- `restoration` smoke now also asserts the unaffordable-upgrade fallback `Play next level` CTA, proving shortage states route back into gameplay instead of trapping the player in a passive upgrade overlay
 - pre-level modal appears before gameplay and confirms into the level
 - game canvas and HUD render together
 - shop purchase persists to save storage
