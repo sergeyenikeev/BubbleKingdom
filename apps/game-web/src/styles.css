@@ -468,7 +468,26 @@ select {
   margin-bottom: 12px;
 }
 
-.overlay-focus-card.is-recovery-ready {
+.overlay-focus-card.is-secondary-focus {
+  background:
+    radial-gradient(circle at top right, rgba(76, 191, 176, 0.08), transparent 34%),
+    linear-gradient(180deg, rgba(255, 250, 242, 0.94), rgba(255, 255, 255, 0.82));
+  border-color: rgba(76, 191, 176, 0.18);
+  box-shadow: 0 12px 24px rgba(15, 31, 45, 0.08);
+}
+
+.screen-spotlight-card {
+  margin-top: 8px;
+}
+
+.prelevel-context-card {
+  margin: 4px 0 2px;
+  border-color: rgba(76, 191, 176, 0.24);
+  box-shadow: 0 14px 30px rgba(76, 191, 176, 0.12);
+}
+
+.overlay-focus-card.is-recovery-ready,
+.prelevel-context-card.is-recovery-ready {
   background:
     radial-gradient(circle at top right, rgba(255, 170, 92, 0.2), transparent 34%),
     linear-gradient(180deg, rgba(255, 246, 232, 0.98), rgba(255, 255, 255, 0.9));

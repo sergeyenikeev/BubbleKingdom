@@ -150,6 +150,14 @@ export interface MapSpotlightState {
   action: NonNullable<RewardRevealState["primaryAction"]>;
 }
 
+export interface ScreenSpotlightState {
+  screenId: ScreenId;
+  tagKey: string;
+  titleKey: string;
+  bodyKey: string;
+  action: MapSpotlightState["action"];
+}
+
 export interface GameSessionState {
   bootStatus: "idle" | "booting" | "ready" | "error";
   currentScreen: ScreenId;
@@ -169,6 +177,7 @@ export interface GameSessionState {
   eventId: string;
   rewardReveal: RewardRevealState | null;
   mapSpotlight: MapSpotlightState | null;
+  screenSpotlight: ScreenSpotlightState | null;
   failRecoveryHint: "gems_continue" | null;
 }
 
@@ -242,6 +251,7 @@ export function createGameSession(input: {
     eventId: defaultRemoteConfig.liveops.currentEventId,
     rewardReveal: null,
     mapSpotlight: null,
+    screenSpotlight: null,
     failRecoveryHint: null,
   };
 
@@ -729,16 +739,33 @@ export function createGameSession(input: {
 
   const openScreenInternal = async (screen: ScreenId) => {
     const previousScreen = state.currentScreen;
-    if (
-      state.mapSpotlight?.action.action === "open-screen" &&
-      state.mapSpotlight.action.id === screen
-    ) {
-      clearMapSpotlight();
-    }
+    const matchedScreenSpotlight =
+      state.mapSpotlight?.action.action === "open-screen" && state.mapSpotlight.action.id === screen
+        ? {
+            screenId: screen,
+            tagKey: state.mapSpotlight.tagKey,
+            titleKey: state.mapSpotlight.titleKey,
+            bodyKey: state.mapSpotlight.bodyKey,
+            action: state.mapSpotlight.action,
+          }
+        : null;
+    const returningScreenSpotlightToMap =
+      screen === "map" && state.screenSpotlight
+        ? {
+            tagKey: state.screenSpotlight.tagKey,
+            titleKey: state.screenSpotlight.titleKey,
+            bodyKey: state.screenSpotlight.bodyKey,
+            action: state.screenSpotlight.action,
+          }
+        : null;
     updateState({
       currentScreen: screen,
       failRecoveryHint: screen === "fail" ? state.failRecoveryHint : null,
       levelPreview: screen === "preLevel" ? state.levelPreview : null,
+      mapSpotlight: matchedScreenSpotlight
+        ? null
+        : returningScreenSpotlightToMap ?? state.mapSpotlight,
+      screenSpotlight: matchedScreenSpotlight ?? (returningScreenSpotlightToMap ? null : state.screenSpotlight),
     });
     const showBanner =
       screen !== "level" &&
@@ -817,10 +844,15 @@ export function createGameSession(input: {
     }
 
     const saveChanged = save !== state.save;
+    const clearCurrentLevelSpotlight =
+      state.mapSpotlight?.action.action === "start-current-level" &&
+      levelId === state.save.progression.currentLevelId;
 
     updateState({
       currentScreen: "level",
       failRecoveryHint: null,
+      mapSpotlight: clearCurrentLevelSpotlight ? null : state.mapSpotlight,
+      screenSpotlight: null,
       save,
       activeLevel: {
         level,
@@ -972,19 +1004,13 @@ export function createGameSession(input: {
         throw new Error(`Unknown level ${levelId}`);
       }
 
-      if (
-        state.mapSpotlight?.action.action === "start-current-level" &&
-        levelId === state.save.progression.currentLevelId
-      ) {
-        clearMapSpotlight();
-      }
-
       updateState({
         currentScreen: "preLevel",
         levelPreview: {
           levelId,
           selectedBoosters: [],
         },
+        screenSpotlight: null,
       });
       await input.platform.ads.setStickyBannerVisible(
         state.remoteConfig.ads.allowBannerOnMap && !state.save.economy.adLightPurchased,
@@ -1599,6 +1625,7 @@ export function createGameSession(input: {
       );
       updateState({
         save: updated,
+        screenSpotlight: state.screenSpotlight?.screenId === "restoration" ? null : state.screenSpotlight,
       });
       refreshShopOffers(updated);
       updateTutorialStep(updated);
@@ -1697,6 +1724,7 @@ export function createGameSession(input: {
       const claimed = claimEventMilestone(state.save, activeEvent, milestoneId);
       updateState({
         save: claimed.save,
+        screenSpotlight: state.screenSpotlight?.screenId === "event" ? null : state.screenSpotlight,
       });
       refreshShopOffers(claimed.save);
       updateTutorialStep(claimed.save);

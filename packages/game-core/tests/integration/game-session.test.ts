@@ -285,7 +285,8 @@ describe("game session integration", () => {
     });
 
     await session.openLevelPreview(1);
-    expect(session.getState().mapSpotlight).toBeNull();
+    expect(session.getState().currentScreen).toBe("preLevel");
+    expect(session.getState().mapSpotlight?.titleKey).toBe(chapters[0]!.titleKey);
 
     await session.closeLevelPreview();
 
@@ -295,6 +296,37 @@ describe("game session integration", () => {
       action: "start-current-level",
       labelKey: "map.play",
     });
+  });
+
+  it("consumes a current-level spotlight only when the level actually starts", async () => {
+    const nowIso = new Date().toISOString();
+    const progressedSave = createDefaultSave({
+      anonymousId: "anon-spotlight-consume",
+      language: "en",
+      nowIso,
+      remoteConfig: defaultRemoteConfig,
+    });
+    progressedSave.progression.lastDailyRewardAt = nowIso;
+    progressedSave.progression.dailyRewardDay = 1;
+    window.localStorage.setItem("bubble-kingdom-test:save", JSON.stringify(progressedSave));
+
+    const session = createSession();
+    await session.boot();
+
+    expect(session.getState().mapSpotlight?.action).toEqual({
+      action: "start-current-level",
+      labelKey: "map.play",
+    });
+
+    await session.openLevelPreview(1);
+    expect(session.getState().mapSpotlight?.action).toEqual({
+      action: "start-current-level",
+      labelKey: "map.play",
+    });
+
+    await session.confirmLevelStart();
+    expect(session.getState().currentScreen).toBe("level");
+    expect(session.getState().mapSpotlight).toBeNull();
   });
 
   it("completes a level, grants rewards, and advances progression", async () => {
@@ -431,6 +463,34 @@ describe("game session integration", () => {
     });
     expect(session.getState().rewardReveal?.rewards?.gems).toBe(120);
     expect(session.getState().rewardReveal?.rewards?.boosters?.bombOrb).toBe(3);
+  });
+
+  it("keeps a shop follow-up spotlight alive when the player backs out of pre-level", async () => {
+    const session = createSession();
+    await session.boot();
+    await session.openScreen("shop");
+    await session.purchaseOffer("starter_pack");
+
+    await session.dismissRewardReveal();
+    expect(session.getState().mapSpotlight?.tagKey).toBe("reward.reveal.shopPlayTag");
+    expect(session.getState().mapSpotlight?.titleKey).toBe("goal.level.title");
+    expect(session.getState().mapSpotlight?.action).toEqual({
+      action: "start-current-level",
+      labelKey: "reward.reveal.keepPlaying",
+    });
+
+    await session.openLevelPreview(1);
+    expect(session.getState().currentScreen).toBe("preLevel");
+    expect(session.getState().mapSpotlight?.tagKey).toBe("reward.reveal.shopPlayTag");
+
+    await session.closeLevelPreview();
+    expect(session.getState().currentScreen).toBe("map");
+    expect(session.getState().mapSpotlight?.tagKey).toBe("reward.reveal.shopPlayTag");
+
+    await session.openLevelPreview(1);
+    await session.confirmLevelStart();
+    expect(session.getState().currentScreen).toBe("level");
+    expect(session.getState().mapSpotlight).toBeNull();
   });
 
   it("uses the platform locale on first boot and preserves a manual language override", async () => {
@@ -623,6 +683,37 @@ describe("game session integration", () => {
     expect(session.getState().rewardReveal?.rewards?.gems).toBe(180);
   });
 
+  it("keeps a fail-safety shop follow-up spotlight alive when the player backs out of pre-level", async () => {
+    const session = createSession();
+    await session.boot();
+    await session.openScreen("shop");
+    await session.purchaseOffer("gem_pack_m");
+
+    await session.dismissRewardReveal();
+    expect(session.getState().mapSpotlight).toEqual({
+      tagKey: "reward.reveal.gemSafetyTag",
+      titleKey: "reward.reveal.gemSafetyTitle",
+      bodyKey: "reward.reveal.gemSafetyBody",
+      action: {
+        action: "start-current-level",
+        labelKey: "reward.reveal.keepPlaying",
+      },
+    });
+
+    await session.openLevelPreview(1);
+    expect(session.getState().currentScreen).toBe("preLevel");
+    expect(session.getState().mapSpotlight?.tagKey).toBe("reward.reveal.gemSafetyTag");
+
+    await session.closeLevelPreview();
+    expect(session.getState().currentScreen).toBe("map");
+    expect(session.getState().mapSpotlight?.tagKey).toBe("reward.reveal.gemSafetyTag");
+
+    await session.openLevelPreview(1);
+    await session.confirmLevelStart();
+    expect(session.getState().currentScreen).toBe("level");
+    expect(session.getState().mapSpotlight).toBeNull();
+  });
+
   it("keeps the fail flow active when a gem pack is purchased as a recovery rescue", async () => {
     const session = createSession();
     await session.boot();
@@ -791,6 +882,76 @@ describe("game session integration", () => {
     expect(session.getState().rewardReveal?.rewards?.petals).toBe(120);
   });
 
+  it("carries a renovation follow-up into the restoration screen after dismissing the reveal", async () => {
+    const session = createSession();
+    await session.boot();
+    await session.openScreen("shop");
+    await session.purchaseOffer("renovation_pack");
+
+    await session.dismissRewardReveal();
+    expect(session.getState().mapSpotlight?.action).toEqual({
+      action: "open-screen",
+      id: "restoration",
+      labelKey: "reward.reveal.viewNextRestore",
+    });
+
+    await session.openScreen("restoration");
+
+    expect(session.getState().currentScreen).toBe("restoration");
+    expect(session.getState().mapSpotlight).toBeNull();
+    expect(session.getState().screenSpotlight).toEqual({
+      screenId: "restoration",
+      tagKey: "reward.reveal.renovationPlanTag",
+      titleKey: chapters[0]!.restorationNodes[0]!.titleKey,
+      bodyKey: "reward.reveal.renovationPlanBody",
+      action: {
+        action: "open-screen",
+        id: "restoration",
+        labelKey: "reward.reveal.viewNextRestore",
+      },
+    });
+
+    await session.openScreen("map");
+    expect(session.getState().screenSpotlight).toBeNull();
+    expect(session.getState().mapSpotlight).toEqual({
+      tagKey: "reward.reveal.renovationPlanTag",
+      titleKey: chapters[0]!.restorationNodes[0]!.titleKey,
+      bodyKey: "reward.reveal.renovationPlanBody",
+      action: {
+        action: "open-screen",
+        id: "restoration",
+        labelKey: "reward.reveal.viewNextRestore",
+      },
+    });
+  });
+
+  it("clears the restoration screen spotlight once the highlighted upgrade is taken", async () => {
+    const progressedSave = createDefaultSave({
+      anonymousId: "anon-restoration-screen-spotlight",
+      language: "en",
+      nowIso: "2026-04-08T00:00:00.000Z",
+      remoteConfig: defaultRemoteConfig,
+    });
+    progressedSave.progression.starsByLevel["1"] = 3;
+    progressedSave.progression.starsByLevel["2"] = 3;
+    window.localStorage.setItem("bubble-kingdom-test:save", JSON.stringify(progressedSave));
+
+    const session = createSession();
+    await session.boot();
+    await session.openScreen("shop");
+    await session.purchaseOffer("renovation_pack");
+    await session.dismissRewardReveal();
+    await session.openScreen("restoration");
+
+    const node = chapters[0]!.restorationNodes[0]!;
+    expect(session.getState().screenSpotlight?.screenId).toBe("restoration");
+
+    await session.restoreArea(node.id);
+
+    expect(session.getState().screenSpotlight).toBeNull();
+    expect(session.getState().rewardReveal?.titleKey).toBe(node.titleKey);
+  });
+
   it("shows an event follow-up reveal after buying the season pass", async () => {
     const session = createSession();
     await session.boot();
@@ -808,6 +969,66 @@ describe("game session integration", () => {
       labelKey: "event.viewTrack",
     });
     expect(session.getState().rewardReveal?.rewards?.seasonalTokens).toBe(120);
+  });
+
+  it("carries a season-pass follow-up into the event screen after dismissing the reveal", async () => {
+    const session = createSession();
+    await session.boot();
+    await session.openScreen("shop");
+    await session.purchaseOffer("season_pass");
+
+    await session.dismissRewardReveal();
+    expect(session.getState().mapSpotlight?.action).toEqual({
+      action: "open-screen",
+      id: "event",
+      labelKey: "event.viewTrack",
+    });
+
+    await session.openScreen("event");
+
+    expect(session.getState().currentScreen).toBe("event");
+    expect(session.getState().mapSpotlight).toBeNull();
+    expect(session.getState().screenSpotlight).toEqual({
+      screenId: "event",
+      tagKey: "reward.reveal.eventSpotlightTag",
+      titleKey: liveEvents[0]!.titleKey,
+      bodyKey: liveEvents[0]!.descriptionKey,
+      action: {
+        action: "open-screen",
+        id: "event",
+        labelKey: "event.viewTrack",
+      },
+    });
+
+    await session.openScreen("map");
+    expect(session.getState().screenSpotlight).toBeNull();
+    expect(session.getState().mapSpotlight).toEqual({
+      tagKey: "reward.reveal.eventSpotlightTag",
+      titleKey: liveEvents[0]!.titleKey,
+      bodyKey: liveEvents[0]!.descriptionKey,
+      action: {
+        action: "open-screen",
+        id: "event",
+        labelKey: "event.viewTrack",
+      },
+    });
+  });
+
+  it("clears the event screen spotlight once the highlighted milestone is claimed", async () => {
+    const session = createSession();
+    await session.boot();
+    await session.openScreen("shop");
+    await session.purchaseOffer("season_pass");
+    await session.dismissRewardReveal();
+    await session.openScreen("event");
+
+    const milestone = liveEvents[0]!.rewardTrack[0]!;
+    expect(session.getState().screenSpotlight?.screenId).toBe("event");
+
+    await session.claimEventReward(milestone.id);
+
+    expect(session.getState().screenSpotlight).toBeNull();
+    expect(session.getState().rewardReveal?.titleKey).toBe(milestone.titleKey);
   });
 
   it("keeps interstitials active after ad light while suppressing sticky banners", async () => {
@@ -1150,6 +1371,23 @@ describe("game session integration", () => {
 
     await session.openLevelPreview(51);
 
+    expect(session.getState().mapSpotlight?.titleKey).toBe(
+      chapters[1]!.restorationNodes[0]!.titleKey,
+    );
+    expect(session.getState().mapSpotlight?.action).toEqual({
+      action: "start-current-level",
+      labelKey: "reward.reveal.startChapter",
+    });
+
+    await session.closeLevelPreview();
+    expect(session.getState().currentScreen).toBe("map");
+    expect(session.getState().mapSpotlight?.titleKey).toBe(
+      chapters[1]!.restorationNodes[0]!.titleKey,
+    );
+
+    await session.openLevelPreview(51);
+    await session.confirmLevelStart();
+    expect(session.getState().currentScreen).toBe("level");
     expect(session.getState().mapSpotlight).toBeNull();
   });
 

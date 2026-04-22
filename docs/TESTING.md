@@ -109,6 +109,8 @@ Playwright smoke covers:
 - `Starter Pack` is covered in smoke as a full `purchase -> reward reveal -> Play next level -> pre-level` flow, and integration tests now assert the same next-level reward reveal contract for both `Starter Pack` and `Welcome Offer`
 - `Booster Pack` is now covered through a `purchase -> reward reveal -> Play next level` smoke path, while `Renovation Pack` is covered through `purchase -> reward reveal -> restoration screen`, with matching integration contracts for both flows
 - `Gem Pack L` is covered in smoke as a `purchase -> fail-safety reward reveal -> Play next level` path, and `Gem Pack M` is asserted in integration with the same reveal contract; `Season Pass` is covered through `purchase -> reward reveal -> event screen` in smoke plus integration
+- `Renovation Pack` and `Season Pass` now also prove `overlay -> back to map -> spotlight restored`, so open-screen monetization follow-ups do not vanish when the player checks the destination and returns without acting
+- Playwright smoke now boots on its own dedicated preview port with server reuse disabled, preventing false negatives from unrelated local preview servers on the same machine
 - pre-level modal appears before gameplay and confirms into the level
 - game canvas and HUD render together
 - shop purchase persists to save storage
@@ -129,6 +131,12 @@ Playwright smoke covers:
 - smoke verifies that choosing `Retry` after a rescue purchase removes the `Recovery ready` headline on the next fail, and integration covers the same `failRecoveryHint` reset contract for both retry and map exit
 - exiting to the map after a rescue purchase is now covered as its own flow: the fail state must clear, but the map must immediately surface a recovery spotlight that routes the player back into the next level
 - the same map spotlight is now asserted as an accent treatment with a primary CTA, so the paid-recovery route remains visually dominant after returning to the kingdom shell
+- `start-current-level` guidance is now explicitly tested across `map -> prelevel -> back -> map -> start`, ensuring the spotlight survives preview exploration and only clears once the level actually starts
+- shop reward reveals now have the same protection: smoke and integration verify that a `Starter Pack` follow-up survives closing the pre-level modal and still routes back into gameplay cleanly
+- pre-level smoke coverage now also checks that purchase, recovery, and chapter-start routes carry a contextual follow-up card into the briefing itself, so the player still sees why this level is being recommended before they commit
+- integration and smoke now both protect the full `reward/chapter follow-up -> prelevel -> back -> map -> start` loop for gem-safety and chapter-start routes, not just the original starter-pack case
+- integration and smoke now also protect `reward reveal -> map spotlight -> event/restoration overlay` continuity, ensuring open-screen beats keep a contextual spotlight card after entering the destination surface
+- smoke also verifies the overlay hierarchy there: `restoration` uses a softer companion focus card under the contextual spotlight, while `event` can intentionally remain a single-card surface when there is no immediate milestone to claim
 - dismissed chapter-chest reveals still leave an event spotlight on the map until the player opens that event
 
 Primary file:

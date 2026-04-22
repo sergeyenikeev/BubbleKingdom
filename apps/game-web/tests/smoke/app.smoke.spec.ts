@@ -260,6 +260,16 @@ test("fail rescue map exit keeps momentum with a recovery spotlight on the map",
   await spotlight.locator('[data-action="start-current-level"]').click();
 
   await expect(page.locator(".prelevel-modal")).toBeVisible();
+  await expect(page.locator(".prelevel-context-card")).toHaveClass(/is-recovery-ready/);
+  await expect(page.locator(".prelevel-context-card")).toContainText("Recovery gems are ready");
+  await page.click('[data-action="close-level-preview"]');
+  await expect(page.locator(".prelevel-modal")).toHaveCount(0);
+  await expect(spotlight).toHaveClass(/is-recovery-ready/);
+  await expect(spotlight.locator('[data-action="start-current-level"]')).toHaveClass(/primary-btn/);
+  await spotlight.locator('[data-action="start-current-level"]').click();
+  await expect(page.locator(".prelevel-modal")).toBeVisible();
+  await page.click('[data-action="confirm-start-level"]');
+  await expect(page.locator(".level-hud")).toBeVisible();
 });
 
 test("shop keeps no ads visible after buying ad light while removing the lighter offer", async ({
@@ -572,6 +582,16 @@ test("starter pack purchase lifts a reward reveal that returns the player to the
   await page.click('.overlay-focus-card [data-action="reward-reveal-primary"]');
   await expect(page.locator(".prelevel-modal")).toBeVisible();
   await expect(page.locator(".prelevel-modal")).toContainText("Play 1");
+  await expect(page.locator(".prelevel-context-card")).toContainText("Play the next level");
+  await expect(page.locator(".prelevel-context-card")).toContainText("fresh bundle");
+  await page.click('[data-action="close-level-preview"]');
+  const spotlight = page.locator(".spotlight-card");
+  await expect(spotlight).toContainText("Next run");
+  await expect(spotlight).toContainText("Play next level");
+  await spotlight.locator('[data-action="start-current-level"]').click();
+  await expect(page.locator(".prelevel-modal")).toBeVisible();
+  await page.click('[data-action="confirm-start-level"]');
+  await expect(page.locator(".level-hud")).toBeVisible();
 });
 
 test("booster pack purchase highlights the next level as the immediate follow-up", async ({
@@ -611,6 +631,16 @@ test("large gem pack purchase frames the next level as a safer recovery run", as
   await page.click('.overlay-focus-card [data-action="reward-reveal-primary"]');
   await expect(page.locator(".prelevel-modal")).toBeVisible();
   await expect(page.locator(".prelevel-modal")).toContainText("Play 1");
+  await expect(page.locator(".prelevel-context-card")).toHaveClass(/is-recovery-ready/);
+  await expect(page.locator(".prelevel-context-card")).toContainText("Recovery gems are ready");
+  await page.click('[data-action="close-level-preview"]');
+  const spotlight = page.locator(".spotlight-card");
+  await expect(spotlight).toHaveClass(/is-recovery-ready/);
+  await expect(spotlight).toContainText("Play next level");
+  await spotlight.locator('[data-action="start-current-level"]').click();
+  await expect(page.locator(".prelevel-modal")).toBeVisible();
+  await page.click('[data-action="confirm-start-level"]');
+  await expect(page.locator(".level-hud")).toBeVisible();
 });
 
 test("renovation pack purchase pivots the player into restoration planning", async ({ page }) => {
@@ -629,7 +659,15 @@ test("renovation pack purchase pivots the player into restoration planning", asy
 
   await page.click('.overlay-focus-card [data-action="reward-reveal-primary"]');
   await expect(page.locator(".restoration-progress-card")).toBeVisible();
+  await expect(page.locator(".screen-spotlight-card")).toContainText("Royal Gardens");
+  await expect(page.locator(".screen-spotlight-card")).toContainText("Next landmark");
+  await expect(page.locator(".overlay-focus-card.is-secondary-focus")).toContainText("Royal Gardens");
   await expect(page.locator(".restoration-card").first()).toBeVisible();
+
+  await page.click('.modal-card [data-action="open-screen"][data-id="map"]');
+  await expect(page.locator(".spotlight-card")).toContainText("Royal Gardens");
+  await expect(page.locator(".spotlight-card")).toContainText("Next landmark");
+  await expect(page.locator('.spotlight-card [data-action="open-screen"][data-id="restoration"]')).toBeVisible();
 });
 
 test("season pass purchase pivots the player into the live event track", async ({ page }) => {
@@ -647,7 +685,15 @@ test("season pass purchase pivots the player into the live event track", async (
 
   await page.click('.overlay-focus-card [data-action="reward-reveal-primary"]');
   await expect(page.locator(".modal-card")).toContainText("Spring Blossom Festival");
+  await expect(page.locator(".screen-spotlight-card")).toContainText("Spring Blossom Festival");
+  await expect(page.locator(".screen-spotlight-card")).toContainText("Event spotlight");
+  await expect(page.locator(".overlay-focus-card.is-secondary-focus")).toHaveCount(0);
   await expect(page.locator(".event-milestone-card").first()).toBeVisible();
+
+  await page.click('.modal-card [data-action="open-screen"][data-id="map"]');
+  await expect(page.locator(".spotlight-card")).toContainText("Spring Blossom Festival");
+  await expect(page.locator(".spotlight-card")).toContainText("Event spotlight");
+  await expect(page.locator('.spotlight-card [data-action="open-screen"][data-id="event"]')).toBeVisible();
 });
 
 test("switches language in settings and updates visible UI copy", async ({ page }) => {
@@ -864,6 +910,16 @@ test("chapter unlock reveal spotlights the next zone on map entry", async ({ pag
   await page.click('[data-action="reward-reveal-primary"]');
   await expect(page.locator(".prelevel-modal")).toBeVisible();
   await expect(page.locator(".prelevel-modal")).toContainText("Play 51");
+  await expect(page.locator(".prelevel-context-card")).toContainText("First landmark");
+  await expect(page.locator(".prelevel-context-card")).toContainText("Royal Gardens");
+  await page.click('[data-action="close-level-preview"]');
+  const spotlight = page.locator(".spotlight-card");
+  await expect(spotlight).toContainText("Royal Gardens");
+  await expect(spotlight).toContainText("Start new chapter");
+  await spotlight.locator('[data-action="start-current-level"]').click();
+  await expect(page.locator(".prelevel-modal")).toBeVisible();
+  await page.click('[data-action="confirm-start-level"]');
+  await expect(page.locator(".level-hud")).toBeVisible();
 });
 
 async function dismissDailyReward(page: Page) {

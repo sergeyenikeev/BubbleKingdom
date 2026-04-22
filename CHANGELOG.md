@@ -10,6 +10,8 @@ The project follows Semantic Versioning and Conventional Commits.
 - added regression coverage that `failRecoveryHint` is cleared on both `Retry` and `Map` exit after in-fail gem rescue purchases
 - turning back to the map from an in-fail gem rescue now keeps a dedicated recovery spotlight alive, so the purchase still hands the player toward the next run instead of dropping them cold on the map
 - upgraded that recovery spotlight into an accent state with a primary CTA, so paid rescue momentum stays visually stronger than ordinary map guidance
+- changed `start-current-level` spotlights to survive the pre-level preview and clear only on actual level start, so guidance is not “spent” just by peeking at the briefing
+- added regression coverage for shop follow-up spotlights surviving `prelevel -> back -> map`, so purchase momentum remains intact even when players inspect the briefing before committing
 
 ## [0.1.0-alpha] - 2026-04-08
 
@@ -61,6 +63,12 @@ The project follows Semantic Versioning and Conventional Commits.
 - Added a pure fail-rescue gem-pack planner plus transparent fail-card coverage copy, so the player can now see the gem shortfall, the selected pack payout, and the post-continue remainder before buying.
 - Added a runtime fail-recovery hint that promotes `continue with gems` right after an in-fail gem purchase, preventing rewarded-first variants from fighting the player's just-purchased rescue path.
 - Added integration and browser smoke coverage for `dismiss reveal -> map spotlight -> follow-up action`, protecting the softer post-reveal guidance path.
+- Added contextual pre-level follow-up cards so purchase, recovery, and chapter-start spotlights now carry their “why now” message into the briefing instead of dropping that momentum at the modal boundary.
+- Tightened `start-current-level` follow-up continuity for gem-pack safety and chapter-start beats by verifying they survive `prelevel -> back -> map` and only clear when the player really commits to gameplay.
+- Added `screenSpotlight` continuity for `event` and `restoration`, so open-screen follow-ups from season-pass and renovation beats now keep their “why now” context inside the destination overlay instead of disappearing on entry.
+- Reduced overlay CTA competition when a `screenSpotlight` is present: destination overlays now demote their actionable focus card into a companion state instead of presenting two equally strong “next step” blocks at once.
+- Added return-trip continuity for `screenSpotlight`: if the player checks `event` or `restoration` and backs out without acting, that follow-up now restores itself to the map hero instead of silently disappearing.
+- Hardened local Playwright smoke runs by moving them onto a dedicated preview port and disabling arbitrary server reuse, so browser regression tests always exercise Bubble Kingdom instead of any unrelated preview already running on the machine.
 - Added post-claim spotlight planning for daily, comeback, and event reward flows so the map/reveal surface can ignore stale daily prompts and route players toward the next meaningful restore or play beat.
 - Simplified the map hero when a spotlight is active by suppressing the competing current-goal card and default primary Play CTA, leaving one clearer next-step action after major beats.
 - Deduplicated map action-digest chips against active spotlights, so chapter chest, event, and quest follow-up beats no longer echo the same prompt twice in the hero shell.
