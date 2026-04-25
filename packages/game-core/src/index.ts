@@ -5,6 +5,7 @@ export * from "./economy/offerDecisioning";
 export * from "./features/featureFlags";
 export * from "./localization/messages";
 export * from "./progression/dailyRewards";
+export * from "./progression/disclosure";
 export * from "./progression/events";
 export * from "./progression/restoration";
 export * from "./progression/sessionGuidance";

@@ -46,6 +46,27 @@ export interface RemoteConfig {
     receiptValidationMode: "stub" | "server" | "platform_only";
     productIdOverrides: Record<"web-mock" | "yandex" | "vk", Record<string, string>>;
   };
+  progressiveDisclosure: {
+    enabled: boolean;
+    menuUnlocks: {
+      questsCompletedLevels: number;
+      eventsCompletedLevels: number;
+      leaderboardsCompletedLevels: number;
+      advancedLevel: number;
+      advancedSessions: number;
+    };
+    store: {
+      initialBuyableThemeId: string;
+      maxVisibleThemeCardsByState: Record<
+        "store_state_0" | "store_state_1" | "store_state_2" | "store_state_3",
+        number
+      >;
+      maxVisibleOffersByState: Record<
+        "store_state_0" | "store_state_1" | "store_state_2" | "store_state_3",
+        number
+      >;
+    };
+  };
   experiments: FeatureFlagDefinition[];
 }
 
@@ -92,6 +113,31 @@ export const defaultRemoteConfig: RemoteConfig = {
       vk: {},
     },
   },
+  progressiveDisclosure: {
+    enabled: true,
+    menuUnlocks: {
+      questsCompletedLevels: 3,
+      eventsCompletedLevels: 5,
+      leaderboardsCompletedLevels: 5,
+      advancedLevel: 15,
+      advancedSessions: 7,
+    },
+    store: {
+      initialBuyableThemeId: "theme_crystal_fountain",
+      maxVisibleThemeCardsByState: {
+        store_state_0: 2,
+        store_state_1: 2,
+        store_state_2: 3,
+        store_state_3: 4,
+      },
+      maxVisibleOffersByState: {
+        store_state_0: 0,
+        store_state_1: 1,
+        store_state_2: 3,
+        store_state_3: 12,
+      },
+    },
+  },
   experiments: [
     {
       key: "interstitial_pacing",
@@ -122,6 +168,26 @@ export const defaultRemoteConfig: RemoteConfig = {
       key: "fail_offer_variant",
       variants: ["rewarded_primary", "gems_primary", "piggy_primary"],
       defaultVariant: "rewarded_primary",
+    },
+    {
+      key: "menu_progressive_disclosure",
+      variants: ["progressive", "full"],
+      defaultVariant: "progressive",
+    },
+    {
+      key: "store_theme_disclosure",
+      variants: ["active_plus_one", "expanded"],
+      defaultVariant: "active_plus_one",
+    },
+    {
+      key: "daily_reward_entry",
+      variants: ["inline_after_first_session", "modal_on_boot"],
+      defaultVariant: "inline_after_first_session",
+    },
+    {
+      key: "leaderboard_unlock_level",
+      variants: ["level_3", "level_5"],
+      defaultVariant: "level_5",
     },
   ],
 };

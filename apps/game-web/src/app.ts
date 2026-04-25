@@ -4,6 +4,7 @@ import {
   levels,
   liveEvents,
   questDefinitions,
+  visualThemes,
 } from "@bubble-kingdom/game-data";
 import type { GameSession, GameSessionState, ScreenId } from "@bubble-kingdom/game-core";
 import {
@@ -14,17 +15,21 @@ import {
   createBoardState,
   decideFailOffer,
   deriveSessionGoal,
+  getProgressiveDisclosureConfig,
+  getVisibleThemeIds,
   getEventProgressSummary,
   planFailRescueGemOffer,
   getChapterRestorationProgress,
   getPiggyBankPresentation,
+  isFeatureUnlocked,
+  isThemeUnlockedForPurchase,
   isPreLevelBoosterSelected,
   preLevelBoosterIds,
   summarizeSessionSurfaceAlerts,
   totalStars,
   translate,
 } from "@bubble-kingdom/game-core";
-import type { LevelDefinition } from "@bubble-kingdom/shared";
+import type { LevelDefinition, VisualThemeDefinition } from "@bubble-kingdom/shared";
 
 declare global {
   interface Window {
@@ -152,6 +157,7 @@ export function mountApp(root: HTMLElement, session: GameSession, debugEnabled: 
     }
 
     canvasHost.classList.toggle("is-hidden", !gameplayVisible);
+    root.dataset.theme = state.save.cosmetics.activeThemeId;
     renderUi(uiLayer, state, debugEnabled);
   });
 
@@ -187,6 +193,8 @@ export function mountApp(root: HTMLElement, session: GameSession, debugEnabled: 
       void session.claimInboxItem(id);
     } else if (action === "purchase-offer" && id) {
       void session.purchaseOffer(id);
+    } else if (action === "select-theme" && id) {
+      void session.selectTheme(id);
     } else if (action === "restore-node" && id) {
       void session.restoreArea(id);
     } else if (action === "claim-chapter-chest" && id) {
@@ -299,21 +307,35 @@ function renderUi(root: HTMLElement, state: GameSessionState, debugEnabled: bool
     chapters.find((chapter) => chapter.levels.includes(state.save.progression.currentLevelId)) ??
     chapters[0]!;
   const activeEvent = resolveActiveEvent(state);
-  const allowEventGoals =
-    state.save.tutorial.completed || state.save.progression.completedLevels.length >= 2;
+  const allowDailyRewardGoals = isFeatureUnlocked({
+    feature: "dailyRewards",
+    save: state.save,
+    remoteConfig: state.remoteConfig,
+  });
+  const allowQuestGoals = isFeatureUnlocked({
+    feature: "quests",
+    save: state.save,
+    remoteConfig: state.remoteConfig,
+  });
+  const allowEventGoals = isFeatureUnlocked({
+    feature: "event",
+    save: state.save,
+    remoteConfig: state.remoteConfig,
+    eventAvailable: Boolean(activeEvent),
+  });
   const surfaceAlerts = summarizeSessionSurfaceAlerts({
     save: state.save,
     chapters,
-    quests: questDefinitions,
-    dailyRewardAvailable: state.dailyRewardAvailable,
+    quests: allowQuestGoals ? questDefinitions : [],
+    dailyRewardAvailable: allowDailyRewardGoals && state.dailyRewardAvailable,
     event: activeEvent,
   });
   const sessionGoal = deriveSessionGoal({
     save: state.save,
     chapters,
-    quests: questDefinitions,
-    dailyRewardAvailable: state.dailyRewardAvailable,
-    event: activeEvent,
+    quests: allowQuestGoals ? questDefinitions : [],
+    dailyRewardAvailable: allowDailyRewardGoals && state.dailyRewardAvailable,
+    event: allowEventGoals ? activeEvent : null,
     allowEventGoals,
   });
 
@@ -340,18 +362,20 @@ function renderUi(root: HTMLElement, state: GameSessionState, debugEnabled: bool
 }
 
 function renderTopBar(state: GameSessionState, t: (key: string) => string) {
+  const visibleCurrencies = getVisibleCurrencyPills(state);
   return `
     <div class="top-bar">
       <div class="brand-card">
         <div class="brand-title">${t("ui.title")}</div>
         <div class="brand-subtitle">${t("ui.tagline")}</div>
       </div>
-      <div class="currency-strip">
-        ${currencyPill(t("currency.gold"), state.save.currencies.gold)}
-        ${currencyPill(t("currency.petals"), state.save.currencies.petals)}
-        ${currencyPill(t("currency.gems"), state.save.currencies.gems)}
-        ${currencyPill(t("currency.seasonalTokens"), state.save.currencies.seasonalTokens)}
-      </div>
+      ${
+        visibleCurrencies.length > 0
+          ? `<div class="currency-strip">${visibleCurrencies
+              .map((item) => currencyPill(t(item.labelKey), item.value))
+              .join("")}</div>`
+          : ""
+      }
     </div>
   `;
 }
@@ -365,28 +389,47 @@ function renderMainLayout(
   t: (key: string) => string,
 ) {
   const piggyBank = getPiggyBankPresentation(state.save, state.remoteConfig, state.shopOffers);
-  const shouldShowPiggyPanel = piggyBank && piggyBank.storedGold > 0;
+  const isSimpleMenu = state.menuState === "menu_state_0" || state.menuState === "menu_state_1";
+  const showDailyButton = isFeatureUnlocked({
+    feature: "dailyRewards",
+    save: state.save,
+    remoteConfig: state.remoteConfig,
+  });
+  const showRestoration = isFeatureUnlocked({
+    feature: "restoration",
+    save: state.save,
+    remoteConfig: state.remoteConfig,
+  });
+  const showEvent = isFeatureUnlocked({
+    feature: "event",
+    save: state.save,
+    remoteConfig: state.remoteConfig,
+    eventAvailable: Boolean(activeEvent),
+  });
+  const shouldShowPiggyPanel = piggyBank && piggyBank.storedGold > 0 && state.menuState === "menu_state_4";
   const currentLevel =
     levels.find((level) => level.id === state.save.progression.currentLevelId) ?? levels[0]!;
   const chestChapter = sessionGoal.kind === "chapter_chest" ? sessionGoal.chapter : chapter;
   const showMapGuidance = state.currentScreen === "map";
   const hasSpotlight = showMapGuidance && Boolean(state.mapSpotlight);
   const tutorialCard = showMapGuidance ? renderTutorialCoachCard(state, t) : "";
+  const levelTrackIds = chapter.levels.slice(0, isSimpleMenu ? 3 : 12);
+  const showSideStack =
+    !isSimpleMenu &&
+    (shouldShowPiggyPanel ||
+      showRestoration ||
+      showEvent ||
+      isMenuStateAtLeast(state.menuState, "menu_state_3"));
   return `
-    <div class="main-layout">
+    <div class="main-layout ${isSimpleMenu ? "is-simple-menu" : ""}">
       <div class="hero-stack">
         <section class="panel hero-panel">
           <span class="tag">${t(chapter.titleKey)}</span>
           <h2>${t(chapter.descriptionKey)}</h2>
-          <div class="hero-grid">
-            <div class="metric-card"><div class="small">${t("ui.currentLevel")}</div><strong>${state.save.progression.currentLevelId}</strong></div>
-            <div class="metric-card"><div class="small">${t("ui.stars")}</div><strong>${totalStars(state.save)}</strong></div>
-            <div class="metric-card"><div class="small">${t("ui.lives")}</div><strong>${state.save.progression.lives}</strong></div>
-            <div class="metric-card metric-card-wide"><div class="small">${t("ui.event")}</div><strong>${activeEvent ? t(activeEvent.titleKey) : "-"}</strong></div>
-          </div>
-          ${showMapGuidance && !hasSpotlight ? renderCurrentGoalCard(sessionGoal, state, t) : ""}
+          ${renderHeroMetrics(state, activeEvent, showEvent, t)}
+          ${showMapGuidance && !hasSpotlight && !isSimpleMenu ? renderCurrentGoalCard(sessionGoal, state, t) : ""}
           ${showMapGuidance ? renderMapSpotlightCard(state, t) : ""}
-          ${showMapGuidance ? renderActionDigest(surfaceAlerts, state, t) : ""}
+          ${showMapGuidance && !isSimpleMenu ? renderActionDigest(surfaceAlerts, state, t) : ""}
           ${tutorialCard}
           <div class="cta-row ${hasSpotlight ? "cta-row-support" : ""}">
             ${
@@ -394,9 +437,13 @@ function renderMainLayout(
                 ? ""
                 : `<button class="primary-btn" data-action="start-current-level">${t("map.play")} ${state.save.progression.currentLevelId}</button>`
             }
-            <button class="secondary-btn" data-action="open-screen" data-id="dailyRewards">${t("screen.rewards")}</button>
+            ${
+              showDailyButton
+                ? `<button class="secondary-btn" data-action="open-screen" data-id="dailyRewards">${t("screen.rewards")}</button>`
+                : ""
+            }
             <button class="ghost-btn" data-action="open-screen" data-id="settings">${t("screen.settings")}</button>
-            <button class="ghost-btn" data-action="auth">Yandex ID</button>
+            ${!isSimpleMenu ? `<button class="ghost-btn" data-action="auth">Yandex ID</button>` : ""}
           </div>
           ${
             state.notifications.length > 0
@@ -410,20 +457,24 @@ function renderMainLayout(
             <span class="tag">${chapter.zoneTheme}</span>
           </div>
           <div class="level-track">
-            ${chapter.levels.slice(0, 12).map((levelId) => renderLevelNode(levelId, state)).join("")}
+            ${levelTrackIds.map((levelId) => renderLevelNode(levelId, state)).join("")}
           </div>
         </section>
       </div>
-      <div class="side-stack">
+      ${
+        showSideStack
+          ? `<div class="side-stack">
         ${shouldShowPiggyPanel ? renderPiggyBankPanel(piggyBank, t) : ""}
-        <section class="panel">
-          ${renderChapterChestCard(chestChapter, state, t)}
-        </section>
-        <section class="panel">
-          ${renderCurrentLevelPreview(state, currentLevel, t)}
-        </section>
-        ${activeEvent ? renderEventSummaryCard(state, activeEvent, t) : ""}
-        <section class="panel">
+        ${
+          isMenuStateAtLeast(state.menuState, "menu_state_3") || sessionGoal.kind === "chapter_chest"
+            ? `<section class="panel">${renderChapterChestCard(chestChapter, state, t)}</section>`
+            : ""
+        }
+        ${!isSimpleMenu ? `<section class="panel">${renderCurrentLevelPreview(state, currentLevel, t)}</section>` : ""}
+        ${activeEvent && showEvent ? renderEventSummaryCard(state, activeEvent, t) : ""}
+        ${
+          showRestoration
+            ? `<section class="panel">
           ${
             isSpotlightAction(state, "restore-node") ||
             isSpotlightAction(state, "open-screen", "restoration")
@@ -445,10 +496,148 @@ function renderMainLayout(
                 })
                 .join("")}
             </div>
-          </section>
-      </div>
+          </section>`
+            : ""
+        }
+      </div>`
+          : ""
+      }
     </div>
   `;
+}
+
+function renderHeroMetrics(
+  state: GameSessionState,
+  activeEvent: (typeof liveEvents)[number] | null,
+  showEvent: boolean,
+  t: (key: string) => string,
+) {
+  const metrics = [
+    `<div class="metric-card"><div class="small">${t("ui.currentLevel")}</div><strong>${state.save.progression.currentLevelId}</strong></div>`,
+  ];
+
+  if (state.menuState !== "menu_state_0" && state.menuState !== "menu_state_1") {
+    metrics.push(
+      `<div class="metric-card"><div class="small">${t("ui.stars")}</div><strong>${totalStars(state.save)}</strong></div>`,
+      `<div class="metric-card"><div class="small">${t("ui.lives")}</div><strong>${state.save.progression.lives}</strong></div>`,
+    );
+  }
+
+  if (showEvent && activeEvent) {
+    metrics.push(
+      `<div class="metric-card metric-card-wide"><div class="small">${t("ui.event")}</div><strong>${t(activeEvent.titleKey)}</strong></div>`,
+    );
+  }
+
+  return `<div class="hero-grid">${metrics.join("")}</div>`;
+}
+
+function getVisibleCurrencyPills(state: GameSessionState) {
+  if (state.menuState === "menu_state_0" || state.menuState === "menu_state_1") {
+    return [];
+  }
+
+  const currencies = [
+    { labelKey: "currency.gold", value: state.save.currencies.gold },
+    { labelKey: "currency.gems", value: state.save.currencies.gems },
+  ];
+
+  if (state.menuState !== "menu_state_2" || state.save.progression.restoredNodes.length > 0) {
+    currencies.splice(1, 0, {
+      labelKey: "currency.petals",
+      value: state.save.currencies.petals,
+    });
+  }
+
+  if (
+    isFeatureUnlocked({
+      feature: "seasonalTokens",
+      save: state.save,
+      remoteConfig: state.remoteConfig,
+      eventAvailable: Boolean(resolveActiveEvent(state)),
+    })
+  ) {
+    currencies.push({
+      labelKey: "currency.seasonalTokens",
+      value: state.save.currencies.seasonalTokens,
+    });
+  }
+
+  return currencies;
+}
+
+function getVisibleBottomTabs(state: GameSessionState): Array<{ id: ScreenId; labelKey: string }> {
+  const activeEvent = resolveActiveEvent(state);
+  const tabs: Array<{ id: ScreenId; labelKey: string }> = [
+    { id: "map", labelKey: "screen.map" },
+  ];
+
+  if (
+    isFeatureUnlocked({
+      feature: "shop",
+      save: state.save,
+      remoteConfig: state.remoteConfig,
+    })
+  ) {
+    tabs.push({ id: "shop", labelKey: "screen.shop" });
+  }
+
+  if (
+    isFeatureUnlocked({
+      feature: "quests",
+      save: state.save,
+      remoteConfig: state.remoteConfig,
+    })
+  ) {
+    tabs.push({ id: "quests", labelKey: "screen.quests" });
+  }
+
+  if (
+    isFeatureUnlocked({
+      feature: "event",
+      save: state.save,
+      remoteConfig: state.remoteConfig,
+      eventAvailable: Boolean(activeEvent),
+    })
+  ) {
+    tabs.push({ id: "event", labelKey: "screen.event" });
+  }
+
+  if (
+    isFeatureUnlocked({
+      feature: "leaderboards",
+      save: state.save,
+      remoteConfig: state.remoteConfig,
+    })
+  ) {
+    tabs.push({ id: "leaderboards", labelKey: "screen.leaderboards" });
+  }
+
+  if (
+    isFeatureUnlocked({
+      feature: "inbox",
+      save: state.save,
+      remoteConfig: state.remoteConfig,
+    })
+  ) {
+    tabs.push({ id: "inbox", labelKey: "screen.inbox" });
+  }
+
+  return tabs;
+}
+
+function isMenuStateAtLeast(
+  current: GameSessionState["menuState"],
+  target: GameSessionState["menuState"],
+) {
+  const order: Record<GameSessionState["menuState"], number> = {
+    menu_state_0: 0,
+    menu_state_1: 1,
+    menu_state_2: 2,
+    menu_state_3: 3,
+    menu_state_4: 4,
+  };
+  return order[current] >= order[target];
 }
 
 function renderLevelNode(levelId: number, state: GameSessionState) {
@@ -631,6 +820,13 @@ function getRecommendedRestorationNodeId(
   state: GameSessionState,
   sessionGoal: ReturnType<typeof deriveSessionGoal>,
 ) {
+  if (
+    state.screenSpotlight?.screenId === "restoration" &&
+    state.screenSpotlight.action.action === "restore-node"
+  ) {
+    return state.screenSpotlight.action.id ?? null;
+  }
+
   if (state.mapSpotlight?.action.action === "restore-node") {
     return state.mapSpotlight.action.id ?? null;
   }
@@ -642,6 +838,13 @@ function getRecommendedEventMilestoneId(
   state: GameSessionState,
   sessionGoal: ReturnType<typeof deriveSessionGoal>,
 ) {
+  if (
+    state.screenSpotlight?.screenId === "event" &&
+    state.screenSpotlight.action.action === "claim-event-reward"
+  ) {
+    return state.screenSpotlight.action.id ?? null;
+  }
+
   if (state.mapSpotlight?.action.action === "claim-event-reward") {
     return state.mapSpotlight.action.id ?? null;
   }
@@ -904,14 +1107,10 @@ function renderBottomNav(
   t: (key: string) => string,
 ) {
   const activeScreen = state.currentScreen === "preLevel" ? "map" : state.currentScreen;
-  const tabs: Array<{ id: ScreenId; labelKey: string }> = [
-    { id: "map", labelKey: "screen.map" },
-    { id: "shop", labelKey: "screen.shop" },
-    { id: "quests", labelKey: "screen.quests" },
-    { id: "event", labelKey: "screen.event" },
-    { id: "leaderboards", labelKey: "screen.leaderboards" },
-    { id: "inbox", labelKey: "screen.inbox" },
-  ];
+  const tabs = getVisibleBottomTabs(state);
+  if (tabs.length <= 1) {
+    return "";
+  }
   return `<div class="bottom-nav">${tabs
     .map((tab) => {
       const badgeCount =
@@ -1142,10 +1341,7 @@ function renderModalContent(
   }
 
   if (state.currentScreen === "shop") {
-    const piggyBank = getPiggyBankPresentation(state.save, state.remoteConfig, state.shopOffers);
-    const offers = orderShopOffersForDisplay(state, piggyBank);
-    const featuredOfferId = getFeaturedShopOfferId(state);
-    return `<div class="panel-actions"><span class="tag">${t("screen.shop")}</span><button class="ghost-btn" data-action="open-screen" data-id="map">${t("screen.map")}</button></div>${renderShopAdStatusCard(state, t)}<div class="offer-grid">${offers.map((offer) => renderShopOfferCard(offer, piggyBank, state.save, featuredOfferId, t)).join("")}</div>`;
+    return renderShopScreen(state, t);
   }
 
   if (state.currentScreen === "quests") {
@@ -1177,7 +1373,7 @@ function renderModalContent(
     const progress = getEventProgressSummary(state.save, activeEvent);
     const nextMilestone = progress.claimableMilestones[0] ?? progress.nextMilestone;
     const recommendedMilestoneId = getRecommendedEventMilestoneId(state, sessionGoal);
-    return `<div class="panel-actions"><span class="tag">${t("screen.event")}</span><button class="ghost-btn" data-action="open-screen" data-id="map">${t("screen.map")}</button></div><h2>${t(activeEvent.titleKey)}</h2><p class="small">${t(activeEvent.descriptionKey)}</p>${renderScreenSpotlightCard(state, t)}${renderEventOverlayFocusCard(state, activeEvent, recommendedMilestoneId, t)}<div class="prelevel-summary-grid"><div class="metric-card"><div class="small">${t("currency.seasonalTokens")}</div><strong>${progress.tokens}</strong></div><div class="metric-card"><div class="small">${t("event.completedMilestones")}</div><strong>${progress.claimedCount}/${activeEvent.rewardTrack.length}</strong></div></div><div class="small">${nextMilestone ? `${progress.claimableMilestones.length > 0 ? t("event.claimReady") : t("event.nextReward")} ${t(nextMilestone.titleKey)}` : t("event.complete")}</div><div class="progress-track"><div class="progress-fill" style="width: ${progress.progressPercent}%"></div></div><div class="offer-grid">${activeEvent.rewardTrack.map((milestone) => { const claimed = progress.claimedMilestoneIds.includes(milestone.id); const claimable = progress.claimableMilestones.some((entry) => entry.id === milestone.id); const recommended = milestone.id === recommendedMilestoneId; const cta = recommended ? `<div class="small spotlight-helper">${t("ui.featuredAbove")}</div>` : `<button class="${claimable ? "primary-btn" : "ghost-btn"}" data-action="claim-event-reward" data-id="${milestone.id}" ${!claimable || claimed ? "disabled" : ""}>${claimed ? t("event.claimed") : claimable ? t("event.claim") : t("event.locked")}</button>`; return `<div class="offer-card event-milestone-card ${claimable || recommended ? "is-highlighted" : ""}"><div class="panel-actions"><strong>${t(milestone.titleKey)}</strong><span class="tag">${milestone.tokenCost} ${t("currency.seasonalTokens")}</span>${recommended ? `<span class="tag tag-accent">${t("ui.recommended")}</span>` : ""}</div><div class="small">${t(milestone.descriptionKey)}</div><div class="small">${formatRewardSummary(milestone.rewards, t)}</div>${cta}</div>`; }).join("")}</div>`;
+      return `<div class="panel-actions"><span class="tag">${t("screen.event")}</span><button class="ghost-btn" data-action="open-screen" data-id="map">${t("screen.map")}</button></div><h2>${t(activeEvent.titleKey)}</h2><p class="small">${t(activeEvent.descriptionKey)}</p>${renderScreenSpotlightCard(state, t)}${renderEventOverlayFocusCard(state, activeEvent, recommendedMilestoneId, t)}<div class="prelevel-summary-grid"><div class="metric-card"><div class="small">${t("currency.seasonalTokens")}</div><strong>${progress.tokens}</strong></div><div class="metric-card"><div class="small">${t("event.completedMilestones")}</div><strong>${progress.claimedCount}/${activeEvent.rewardTrack.length}</strong></div></div><div class="small">${nextMilestone ? `${progress.claimableMilestones.length > 0 ? t("event.claimReady") : t("event.nextReward")} ${t(nextMilestone.titleKey)}` : t("event.complete")}</div><div class="progress-track"><div class="progress-fill" style="width: ${progress.progressPercent}%"></div></div><div class="offer-grid">${activeEvent.rewardTrack.map((milestone) => { const claimed = progress.claimedMilestoneIds.includes(milestone.id); const claimable = progress.claimableMilestones.some((entry) => entry.id === milestone.id); const recommended = milestone.id === recommendedMilestoneId; const cta = recommended ? `<div class="small spotlight-helper">${t("ui.featuredAbove")}</div>` : `<button class="${claimable ? "primary-btn" : "ghost-btn"}" data-action="claim-event-reward" data-id="${milestone.id}" ${!claimable || claimed ? "disabled" : ""}>${claimed ? t("event.claimed") : claimable ? t("event.claim") : t("event.locked")}</button>`; return `<div class="offer-card event-milestone-card ${recommended ? "is-highlighted" : ""}"><div class="panel-actions"><strong>${t(milestone.titleKey)}</strong><span class="tag">${milestone.tokenCost} ${t("currency.seasonalTokens")}</span>${recommended ? `<span class="tag tag-accent">${t("ui.recommended")}</span>` : ""}</div><div class="small">${t(milestone.descriptionKey)}</div><div class="small">${formatRewardSummary(milestone.rewards, t)}</div>${cta}</div>`; }).join("")}</div>`;
   }
 
   return `<div class="panel-actions"><span class="tag">${t("screen.settings")}</span><button class="ghost-btn" data-action="open-screen" data-id="map">${t("screen.map")}</button></div><div class="settings-grid">${state.activeLevel ? `<button class="primary-btn" data-action="open-screen" data-id="level">${t("level.resume")}</button>` : ""}<button class="secondary-btn" data-action="set-language" data-id="ru">RU</button><button class="secondary-btn" data-action="set-language" data-id="en">EN</button><button class="ghost-btn" data-action="toggle-setting" data-id="soundEnabled">${t("settings.sound")}: ${state.save.settings.soundEnabled ? t("ui.on") : t("ui.off")}</button><button class="ghost-btn" data-action="toggle-setting" data-id="musicEnabled">${t("settings.music")}: ${state.save.settings.musicEnabled ? t("ui.on") : t("ui.off")}</button><button class="ghost-btn" data-action="toggle-setting" data-id="vibrationEnabled">${t("settings.vibration")}: ${state.save.settings.vibrationEnabled ? t("ui.on") : t("ui.off")}</button><button class="ghost-btn" data-action="toggle-setting" data-id="muted">${t("settings.mute")}: ${state.save.settings.muted ? t("ui.on") : t("ui.off")}</button></div>`;
@@ -1416,6 +1612,94 @@ function renderPiggyBankUpsellCard(
 
   const piggyOffer = state.shopOffers.find((offer) => offer.id === piggyBank.offerId);
   return `<div class="offer-card fail-offer-card ${decision.primaryAction === "piggy_bank" ? "is-highlighted" : ""}"><div class="panel-actions"><strong>${t("shop.piggy.title")}</strong>${decision.primaryAction === "piggy_bank" ? `<span class="tag tag-accent">${t("ui.recommended")}</span>` : piggyOffer?.badgeKey ? `<span class="tag">${t(piggyOffer.badgeKey)}</span>` : ""}</div><div class="small">${piggyBank.isSpotlighted ? t("shop.piggy.readyNow") : t("shop.piggy.nearlyReady")}</div><div class="progress-track"><div class="progress-fill" style="width: ${piggyBank.fillPercent}%"></div></div><div class="small">${t("shop.piggy.progress")} ${piggyBank.storedGold}/${piggyBank.cap} &middot; ${piggyBank.fillPercent}%</div><div class="small">${t("shop.piggy.bonusPreview")} ${piggyBank.bonusGems} ${t("currency.gems")}</div><div class="panel-actions"><span class="small">${piggyOffer?.platformPriceLabel ?? ""}</span><button class="${decision.primaryAction === "piggy_bank" ? "primary-btn" : "secondary-btn"}" data-action="purchase-offer" data-id="${piggyBank.offerId}">${t("shop.piggy.breakOpen")}</button></div></div>`;
+}
+
+function renderShopScreen(state: GameSessionState, t: (key: string) => string) {
+  const piggyBank = getPiggyBankPresentation(state.save, state.remoteConfig, state.shopOffers);
+  const offers = getVisibleShopOffersForStore(state, piggyBank);
+  const featuredOfferId = getFeaturedShopOfferId(state);
+  const showAdStatus =
+    state.storeState === "store_state_3" ||
+    state.save.economy.adLightPurchased ||
+    state.save.economy.noAdsPurchased;
+
+  return `<div class="panel-actions"><span class="tag">${t("screen.shop")}</span><button class="ghost-btn" data-action="open-screen" data-id="map">${t("screen.map")}</button></div>${renderThemeShopSection(state, t)}${showAdStatus ? renderShopAdStatusCard(state, t) : ""}${offers.length > 0 ? `<div class="offer-grid">${offers.map((offer) => renderShopOfferCard(offer, piggyBank, state.save, featuredOfferId, t)).join("")}</div>` : ""}`;
+}
+
+function renderThemeShopSection(state: GameSessionState, t: (key: string) => string) {
+  const visibleThemeIds = getVisibleThemeIds({
+    themes: visualThemes,
+    save: state.save,
+    remoteConfig: state.remoteConfig,
+  });
+  const visibleThemes = visibleThemeIds
+    .map((themeId) => visualThemes.find((theme) => theme.id === themeId))
+    .filter((theme): theme is VisualThemeDefinition => Boolean(theme));
+
+  return `<section class="theme-shop-section"><div class="panel-actions"><span class="tag">${t("theme.section.title")}</span><span class="small">${t("theme.section.body")}</span></div><div class="theme-grid">${visibleThemes.map((theme) => renderThemeCard(theme, state, t)).join("")}</div></section>`;
+}
+
+function renderThemeCard(
+  theme: VisualThemeDefinition,
+  state: GameSessionState,
+  t: (key: string) => string,
+) {
+  const owned = state.save.cosmetics.unlockedThemeIds.includes(theme.id);
+  const active = state.save.cosmetics.activeThemeId === theme.id;
+  const unlockedForPurchase = isThemeUnlockedForPurchase(theme, state.save, state.remoteConfig);
+  const cta = active
+    ? `<button class="ghost-btn" data-action="select-theme" data-id="${theme.id}" disabled>${t("theme.active")}</button>`
+    : owned
+      ? `<button class="secondary-btn" data-action="select-theme" data-id="${theme.id}">${t("theme.use")}</button>`
+      : unlockedForPurchase
+        ? `<button class="primary-btn" data-action="select-theme" data-id="${theme.id}">${t("shop.buy")}</button>`
+        : `<button class="ghost-btn" data-action="select-theme" data-id="${theme.id}" disabled>${t("theme.unlockLater")}</button>`;
+  const price =
+    !owned && unlockedForPurchase
+      ? `<div class="small">${t("theme.price")}: ${theme.price.gems} ${t("currency.gems")}</div>`
+      : "";
+  return `<div class="theme-card ${active ? "is-active" : ""} ${!owned && !unlockedForPurchase ? "is-locked" : ""}" data-theme-id="${theme.id}"><div class="theme-preview ${theme.previewClass}"></div><div class="panel-actions"><strong>${t(theme.titleKey)}</strong>${active ? `<span class="tag tag-accent">${t("theme.active")}</span>` : ""}</div><div class="small">${t(theme.descriptionKey)}</div>${price}<div class="cta-row">${cta}</div></div>`;
+}
+
+function getVisibleShopOffersForStore(
+  state: GameSessionState,
+  piggyBank: ReturnType<typeof getPiggyBankPresentation>,
+) {
+  const maxVisible =
+    getProgressiveDisclosureConfig(state.remoteConfig).store.maxVisibleOffersByState[state.storeState];
+  if (maxVisible <= 0) {
+    return [];
+  }
+
+  return orderShopOffersForDisplay(state, piggyBank)
+    .filter((offer) => isOfferVisibleInStoreState(offer, state, piggyBank))
+    .slice(0, maxVisible);
+}
+
+function isOfferVisibleInStoreState(
+  offer: GameSessionState["shopOffers"][number],
+  state: GameSessionState,
+  piggyBank: ReturnType<typeof getPiggyBankPresentation>,
+) {
+  if (state.storeState === "store_state_0") {
+    return false;
+  }
+
+  if (state.storeState === "store_state_1") {
+    return offer.type === "starter_pack" || offer.type === "welcome_offer";
+  }
+
+  if (state.storeState === "store_state_2") {
+    return (
+      offer.type === "starter_pack" ||
+      offer.type === "welcome_offer" ||
+      offer.id === "gem_pack_s" ||
+      offer.type === "booster_pack" ||
+      (offer.type === "piggy_bank" && Boolean(piggyBank?.isNudged))
+    );
+  }
+
+  return true;
 }
 
 function orderShopOffersForDisplay(

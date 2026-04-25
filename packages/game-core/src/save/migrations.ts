@@ -14,6 +14,9 @@ export function migrateSave(raw: unknown): PlayerSave {
   if ((migrated.schemaVersion ?? 0) < 4) {
     migrated = migrateV3ToV4(migrated);
   }
+  if ((migrated.schemaVersion ?? 0) < 5) {
+    migrated = migrateV4ToV5(migrated);
+  }
 
   return playerSaveSchema.parse({
     ...migrated,
@@ -53,5 +56,32 @@ function migrateV3ToV4(raw: Partial<PlayerSave>) {
     ...raw,
     schemaVersion: 4,
     events: raw.events ?? {},
+  };
+}
+
+function migrateV4ToV5(raw: Partial<PlayerSave>) {
+  const completedLevels = raw.progression?.completedLevels ?? [];
+  const inferredHasStartedLevel =
+    completedLevels.length > 0 || (raw.progression?.currentLevelId ?? 1) > 1;
+  const hasStartedLevel = raw.engagement?.hasStartedLevel ?? inferredHasStartedLevel;
+  const firstCompletedAt =
+    raw.engagement?.firstLevelCompletedAt ??
+    (completedLevels.length > 0 ? raw.profile?.lastSessionAt ?? null : null);
+
+  return {
+    ...raw,
+    schemaVersion: 5,
+    engagement: raw.engagement ?? {
+      sessionCount: 0,
+      hasStartedLevel,
+      firstLevelStartedAt: hasStartedLevel ? raw.profile?.lastSessionAt ?? null : null,
+      firstLevelCompletedAt: firstCompletedAt,
+      firstLevelFailedAt: null,
+      storeIntroSeen: false,
+    },
+    cosmetics: raw.cosmetics ?? {
+      activeThemeId: "theme_blossom_gardens",
+      unlockedThemeIds: ["theme_blossom_gardens"],
+    },
   };
 }

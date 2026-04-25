@@ -6,12 +6,17 @@ The project follows Semantic Versioning and Conventional Commits.
 
 ## Unreleased
 
+- event reward reveals now keep claimable follow-up momentum inside the `event` overlay itself, so dismissing a claimed milestone reveal can hand straight to the next claimable reward before falling back to the map
+- when an event reward is claimed and no further milestone is ready, the reveal now pivots to `Play next level`, keeping the player in the event loop by sending them back to token earning
+- reduced `event` overlay CTA noise by highlighting only the recommended milestone card, letting other claimable rewards stay actionable without competing with the single focus card
 - toned down the fail-screen `retry / map` footer when `Recovery ready` is active, so purchased gem recovery remains the single clear next step
 - added regression coverage that `failRecoveryHint` is cleared on both `Retry` and `Map` exit after in-fail gem rescue purchases
 - turning back to the map from an in-fail gem rescue now keeps a dedicated recovery spotlight alive, so the purchase still hands the player toward the next run instead of dropping them cold on the map
 - upgraded that recovery spotlight into an accent state with a primary CTA, so paid rescue momentum stays visually stronger than ordinary map guidance
 - changed `start-current-level` spotlights to survive the pre-level preview and clear only on actual level start, so guidance is not “spent” just by peeking at the briefing
 - added regression coverage for shop follow-up spotlights surviving `prelevel -> back -> map`, so purchase momentum remains intact even when players inspect the briefing before committing
+
+- added next-target restoration highlights after real rebuilds, so `restore -> View next restore` now carries the follow-up landmark into both map spotlights and the restoration overlay itself
 
 ## [0.1.0-alpha] - 2026-04-08
 

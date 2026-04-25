@@ -275,6 +275,7 @@ test("fail rescue map exit keeps momentum with a recovery spotlight on the map",
 test("shop keeps no ads visible after buying ad light while removing the lighter offer", async ({
   page,
 }) => {
+  await seedAdvancedShopProfile(page);
   await dismissDailyReward(page);
 
   await page.click('[data-action="open-screen"][data-id="shop"]');
@@ -320,6 +321,7 @@ test("shop keeps no ads visible after buying ad light while removing the lighter
 test("direct no ads purchase switches the shop into a completed ad-free status", async ({
   page,
 }) => {
+  await seedAdvancedShopProfile(page);
   await dismissDailyReward(page);
 
   await page.click('[data-action="open-screen"][data-id="shop"]');
@@ -364,6 +366,7 @@ test("direct no ads purchase switches the shop into a completed ad-free status",
 test("ad light upgrade CTA on the status card completes the no ads purchase", async ({
   page,
 }) => {
+  await seedAdvancedShopProfile(page);
   await dismissDailyReward(page);
 
   await page.click('[data-action="open-screen"][data-id="shop"]');
@@ -382,6 +385,8 @@ test("ad light upgrade CTA on the status card completes the no ads purchase", as
 });
 
 test("claiming the daily reward leaves one clear next-step spotlight on the map", async ({ page }) => {
+  await seedDailyUnlockedProfile(page);
+  await openDailyRewardsScreen(page);
   const claimButton = page.locator('[data-action="claim-daily"]');
   await expect(claimButton).toBeVisible();
 
@@ -399,11 +404,13 @@ test("claiming the daily reward leaves one clear next-step spotlight on the map"
 });
 
 test("daily rewards screen becomes a tomorrow teaser after today's reward is collected", async ({ page }) => {
+  await seedDailyUnlockedProfile(page);
+  await openDailyRewardsScreen(page);
   const claimButton = page.locator('[data-action="claim-daily"]');
   await expect(claimButton).toBeVisible();
   await claimButton.click();
 
-  await page.click('[data-action="open-screen"][data-id="dailyRewards"]');
+  await openDailyRewardsScreen(page);
 
   const dailyScreen = page.locator(".daily-rewards-screen");
   await expect(dailyScreen).toContainText("Come back tomorrow");
@@ -414,6 +421,7 @@ test("daily rewards screen becomes a tomorrow teaser after today's reward is col
 });
 
 test("claiming the daily reward can spotlight an affordable restoration and suppress duplicate restore CTAs", async ({ page }) => {
+  await seedDailyUnlockedProfile(page);
   await page.evaluate(() => {
     const raw = window.localStorage.getItem("bubble-kingdom:save");
     if (!raw) {
@@ -429,6 +437,7 @@ test("claiming the daily reward can spotlight an affordable restoration and supp
   });
 
   await page.reload();
+  await openDailyRewardsScreen(page);
   const claimButton = page.locator('[data-action="claim-daily"]');
   await expect(claimButton).toBeVisible();
   await claimButton.click();
@@ -449,7 +458,13 @@ test("claiming the daily reward can spotlight an affordable restoration and supp
 });
 
 test("claiming a quest refreshes the map spotlight to the next best restoration action", async ({ page }) => {
-  await dismissDailyReward(page);
+  await seedProgressiveProfile(page, {
+    currentLevelId: 4,
+    completedLevels: [1, 2, 3],
+    sessionCount: 2,
+    tutorialCompleted: true,
+    dailyAvailable: false,
+  });
 
   await page.evaluate(() => {
     const raw = window.localStorage.getItem("bubble-kingdom:save");
@@ -462,6 +477,8 @@ test("claiming a quest refreshes the map spotlight to the next best restoration 
       progression: {
         lastDailyRewardAt: string | null;
         dailyRewardDay: number;
+        currentLevelId: number;
+        completedLevels: number[];
         starsByLevel: Record<string, number>;
       };
       quests: Record<
@@ -476,6 +493,8 @@ test("claiming a quest refreshes the map spotlight to the next best restoration 
     };
     save.progression.lastDailyRewardAt = nowIso;
     save.progression.dailyRewardDay = 1;
+    save.progression.currentLevelId = 4;
+    save.progression.completedLevels = [1, 2, 3];
     save.progression.starsByLevel["1"] = 3;
     save.progression.starsByLevel["2"] = 3;
     save.quests.daily_complete_3 = {
@@ -549,6 +568,7 @@ test("inbox screen keeps the comeback reward highlighted as the recommended clai
 test("starter pack purchase lifts a reward reveal that returns the player to the next level", async ({
   page,
 }) => {
+  await seedAdvancedShopProfile(page);
   await dismissDailyReward(page);
 
   await page.click('[data-action="open-screen"][data-id="shop"]');
@@ -597,6 +617,7 @@ test("starter pack purchase lifts a reward reveal that returns the player to the
 test("booster pack purchase highlights the next level as the immediate follow-up", async ({
   page,
 }) => {
+  await seedAdvancedShopProfile(page);
   await dismissDailyReward(page);
 
   await page.click('[data-action="open-screen"][data-id="shop"]');
@@ -615,6 +636,7 @@ test("booster pack purchase highlights the next level as the immediate follow-up
 });
 
 test("large gem pack purchase frames the next level as a safer recovery run", async ({ page }) => {
+  await seedAdvancedShopProfile(page);
   await dismissDailyReward(page);
 
   await page.click('[data-action="open-screen"][data-id="shop"]');
@@ -644,6 +666,7 @@ test("large gem pack purchase frames the next level as a safer recovery run", as
 });
 
 test("renovation pack purchase pivots the player into restoration planning", async ({ page }) => {
+  await seedAdvancedShopProfile(page);
   await dismissDailyReward(page);
 
   await page.click('[data-action="open-screen"][data-id="shop"]');
@@ -672,6 +695,7 @@ test("renovation pack purchase pivots the player into restoration planning", asy
 });
 
 test("season pass purchase pivots the player into the live event track", async ({ page }) => {
+  await seedAdvancedShopProfile(page);
   await dismissDailyReward(page);
 
   await page.click('[data-action="open-screen"][data-id="shop"]');
@@ -688,16 +712,17 @@ test("season pass purchase pivots the player into the live event track", async (
   await expect(page.locator(".modal-card")).toContainText("Spring Blossom Festival");
   await expect(page.locator(".screen-spotlight-card")).toContainText("Spring Blossom Festival");
   await expect(page.locator(".screen-spotlight-card")).toContainText("Event spotlight");
-  await expect(page.locator(".overlay-focus-card.is-secondary-focus")).toContainText("Play next level");
-  await expect(page.locator(".overlay-focus-card.is-secondary-focus")).toContainText("Next reward:");
+  await expect(page.locator(".overlay-focus-card.is-secondary-focus")).toContainText("Seed Satchel");
+  await expect(
+    page.locator('.overlay-focus-card.is-secondary-focus [data-action="claim-event-reward"]'),
+  ).toHaveCount(1);
   await page.click('.modal-card [data-action="open-screen"][data-id="map"]');
   await expect(page.locator(".spotlight-card")).toContainText("Spring Blossom Festival");
   await expect(page.locator(".spotlight-card")).toContainText("Event spotlight");
   await expect(page.locator('.spotlight-card [data-action="open-screen"][data-id="event"]')).toBeVisible();
   await page.click('.spotlight-card [data-action="open-screen"][data-id="event"]');
   await expect(page.locator(".screen-spotlight-card")).toContainText("Spring Blossom Festival");
-  await page.click('.overlay-focus-card.is-secondary-focus [data-action="start-current-level"]');
-  await expect(page.locator(".prelevel-modal")).toBeVisible();
+  await expect(page.locator(".overlay-focus-card.is-secondary-focus")).toContainText("Seed Satchel");
 });
 
 test("switches language in settings and updates visible UI copy", async ({ page }) => {
@@ -714,6 +739,7 @@ test("switches language in settings and updates visible UI copy", async ({ page 
 });
 
 test("opens the event screen and renders the live reward track", async ({ page }) => {
+  await seedEventUnlockedProfile(page);
   await dismissDailyReward(page);
 
   await expect(page.locator(".event-summary-panel")).toContainText("Spring Blossom Festival");
@@ -736,14 +762,22 @@ test("event overlay lifts the claimable milestone into a single focus CTA", asyn
 
     const nowIso = new Date().toISOString();
     const save = JSON.parse(raw) as {
-      currencies: { seasonalTokens: number };
-      progression: { lastDailyRewardAt: string | null; dailyRewardDay: number; completedLevels: number[] };
+      currencies: { seasonalTokens: number; gold: number; petals: number };
+      progression: {
+        lastDailyRewardAt: string | null;
+        dailyRewardDay: number;
+        completedLevels: number[];
+        currentLevelId: number;
+      };
       tutorial: { completed: boolean };
     };
-    save.currencies.seasonalTokens = 25;
+    save.currencies.seasonalTokens = 60;
+    save.currencies.gold = 0;
+    save.currencies.petals = 0;
     save.progression.lastDailyRewardAt = nowIso;
     save.progression.dailyRewardDay = 1;
     save.progression.completedLevels = [1, 2];
+    save.progression.currentLevelId = 3;
     save.tutorial.completed = true;
     window.localStorage.setItem("bubble-kingdom:save", JSON.stringify(save));
   });
@@ -755,6 +789,10 @@ test("event overlay lifts the claimable milestone into a single focus CTA", asyn
   await expect(
     page.locator('.overlay-focus-card [data-action="claim-event-reward"][data-id="spring_blossom_seed_satchel"]'),
   ).toHaveCount(1);
+  await expect(page.locator(".event-milestone-card.is-highlighted")).toHaveCount(1);
+  await expect(
+    page.locator('.event-milestone-card.is-highlighted strong'),
+  ).toContainText("Seed Satchel");
   await expect(page.locator(".event-milestone-card.is-highlighted")).toContainText("Featured above");
   await expect(
     page.locator('.event-milestone-card.is-highlighted [data-action="claim-event-reward"]'),
@@ -762,6 +800,65 @@ test("event overlay lifts the claimable milestone into a single focus CTA", asyn
 
   await page.locator('.overlay-focus-card [data-action="claim-event-reward"]').click();
   await expect(page.locator(".reward-reveal-modal")).toContainText("Seed Satchel");
+  await page.click('[data-action="dismiss-reward-reveal"]');
+  await expect(page.locator(".screen-spotlight-card")).toContainText("Blossom Boost");
+  await expect(page.locator(".overlay-focus-card.is-secondary-focus")).toContainText("Blossom Boost");
+  await expect(
+    page.locator('.overlay-focus-card.is-secondary-focus [data-action="claim-event-reward"][data-id="spring_blossom_blossom_boost"]'),
+  ).toHaveCount(1);
+  await expect(page.locator(".event-milestone-card.is-highlighted")).toHaveCount(1);
+  await expect(
+    page.locator('.event-milestone-card.is-highlighted strong'),
+  ).toContainText("Blossom Boost");
+  await expect(page.locator(".event-milestone-card.is-highlighted")).toContainText("Featured above");
+});
+
+test("event claim without another ready milestone pivots the overlay into a play-next-level follow-up", async ({
+  page,
+}) => {
+  await dismissDailyReward(page);
+
+  await page.evaluate(() => {
+    const raw = window.localStorage.getItem("bubble-kingdom:save");
+    if (!raw) {
+      throw new Error("Expected save to exist before seeding event fallback test.");
+    }
+
+    const nowIso = new Date().toISOString();
+    const save = JSON.parse(raw) as {
+      currencies: { seasonalTokens: number; gold: number; petals: number };
+      progression: {
+        lastDailyRewardAt: string | null;
+        dailyRewardDay: number;
+        completedLevels: number[];
+        currentLevelId: number;
+      };
+      tutorial: { completed: boolean };
+    };
+    save.currencies.seasonalTokens = 25;
+    save.currencies.gold = 0;
+    save.currencies.petals = 0;
+    save.progression.lastDailyRewardAt = nowIso;
+    save.progression.dailyRewardDay = 1;
+    save.progression.completedLevels = [1, 2];
+    save.progression.currentLevelId = 3;
+    save.tutorial.completed = true;
+    window.localStorage.setItem("bubble-kingdom:save", JSON.stringify(save));
+  });
+
+  await page.reload();
+  await page.click('[data-action="open-screen"][data-id="event"]');
+  await page.locator('.overlay-focus-card [data-action="claim-event-reward"][data-id="spring_blossom_seed_satchel"]').click();
+
+  await expect(page.locator(".reward-reveal-modal")).toContainText("Seed Satchel");
+  await page.click('[data-action="dismiss-reward-reveal"]');
+
+  await expect(page.locator(".screen-spotlight-card")).toContainText("Earn tokens in the next level");
+  await expect(page.locator(".overlay-focus-card.is-secondary-focus")).toContainText("Earn tokens in the next level");
+  await expect(page.locator(".event-milestone-card.is-highlighted")).toHaveCount(0);
+  await page.locator('.overlay-focus-card.is-secondary-focus [data-action="start-current-level"]').click();
+  await expect(page.locator(".prelevel-modal")).toBeVisible();
+  await expect(page.locator(".prelevel-modal")).toContainText("Play 3");
 });
 
 test("restoration reveal guides the player to the next restoration target", async ({ page }) => {
@@ -836,14 +933,21 @@ test("restoration overlay lifts the recommended upgrade into a single focus CTA"
   await expect(page.locator(".reward-reveal-modal")).toContainText("Royal Gardens");
   await page.click('[data-action="reward-reveal-primary"]');
 
-  await expect(page.locator(".overlay-focus-card")).toContainText("Crystal Fountain");
-  await expect(page.locator('.overlay-focus-card [data-action="restore-node"]')).toHaveCount(1);
+  await expect(page.locator(".screen-spotlight-card")).toContainText("Crystal Fountain");
+  await expect(page.locator(".screen-spotlight-card")).toContainText("Ready to restore");
+  await expect(page.locator(".overlay-focus-card.is-secondary-focus")).toContainText("Crystal Fountain");
+  await expect(page.locator('.overlay-focus-card.is-secondary-focus [data-action="restore-node"]')).toHaveCount(1);
   await expect(page.locator(".restoration-card.is-highlighted")).toContainText("Featured above");
   await expect(page.locator('.restoration-card.is-highlighted [data-action="restore-node"]')).toHaveCount(0);
 });
 
 test("restoration overlay sends the player back into gameplay when the upgrade is not affordable", async ({ page }) => {
-  await dismissDailyReward(page);
+  await seedProgressiveProfile(page, {
+    currentLevelId: 1,
+    sessionCount: 1,
+    tutorialCompleted: false,
+    dailyAvailable: false,
+  });
 
   await page.evaluate(() => {
     const raw = window.localStorage.getItem("bubble-kingdom:save");
@@ -874,6 +978,7 @@ test("restoration overlay sends the player back into gameplay when the upgrade i
 });
 
 test("chapter chest follow-up persists on the map until the player opens the featured event", async ({ page }) => {
+  await seedEventUnlockedProfile(page);
   await dismissDailyReward(page);
 
   await page.evaluate(() => {
@@ -956,6 +1061,107 @@ test("chapter unlock reveal spotlights the next zone on map entry", async ({ pag
   await page.click('[data-action="confirm-start-level"]');
   await expect(page.locator(".level-hud")).toBeVisible();
 });
+
+async function seedAdvancedShopProfile(page: Page) {
+  await seedProgressiveProfile(page, {
+    currentLevelId: 1,
+    completedLevels: [1, 2, 3, 4, 5],
+    sessionCount: 3,
+    tutorialCompleted: true,
+    dailyAvailable: false,
+  });
+  await page.reload();
+  await expect(page.locator(".brand-title")).toBeVisible();
+}
+
+async function seedDailyUnlockedProfile(page: Page) {
+  await seedProgressiveProfile(page, {
+    currentLevelId: 1,
+    sessionCount: 1,
+    tutorialCompleted: false,
+    dailyAvailable: true,
+  });
+  await page.reload();
+  await expect(page.locator(".brand-title")).toBeVisible();
+}
+
+async function seedEventUnlockedProfile(page: Page) {
+  await seedProgressiveProfile(page, {
+    currentLevelId: 6,
+    completedLevels: [1, 2, 3, 4, 5],
+    sessionCount: 3,
+    tutorialCompleted: true,
+    dailyAvailable: false,
+  });
+  await page.reload();
+  await expect(page.locator(".brand-title")).toBeVisible();
+}
+
+async function seedProgressiveProfile(
+  page: Page,
+  input: {
+    currentLevelId: number;
+    completedLevels?: number[];
+    sessionCount: number;
+    tutorialCompleted: boolean;
+    dailyAvailable: boolean;
+  },
+) {
+  await page.evaluate((profile) => {
+    const raw = window.localStorage.getItem("bubble-kingdom:save");
+    if (!raw) {
+      throw new Error("Expected save to exist before seeding progressive profile.");
+    }
+
+    const nowIso = new Date().toISOString();
+    const completedLevels = profile.completedLevels ?? [];
+    const save = JSON.parse(raw) as {
+      profile: { lastSessionAt: string };
+      progression: {
+        completedLevels: number[];
+        currentLevelId: number;
+        lastDailyRewardAt: string | null;
+        dailyRewardDay: number;
+        starsByLevel: Record<string, number>;
+      };
+      tutorial: { completed: boolean };
+      engagement?: {
+        sessionCount: number;
+        hasStartedLevel: boolean;
+        firstLevelStartedAt: string | null;
+        firstLevelCompletedAt: string | null;
+        firstLevelFailedAt: string | null;
+        storeIntroSeen: boolean;
+      };
+    };
+
+    save.profile.lastSessionAt = nowIso;
+    save.progression.currentLevelId = profile.currentLevelId;
+    save.progression.completedLevels = completedLevels;
+    save.progression.lastDailyRewardAt = profile.dailyAvailable ? null : nowIso;
+    save.progression.dailyRewardDay = profile.dailyAvailable ? save.progression.dailyRewardDay : 1;
+    save.tutorial.completed = profile.tutorialCompleted;
+
+    const firstResultAt = completedLevels.length > 0 ? nowIso : null;
+    save.engagement = {
+      sessionCount: Math.max(profile.sessionCount, save.engagement?.sessionCount ?? 0),
+      hasStartedLevel: true,
+      firstLevelStartedAt: save.engagement?.firstLevelStartedAt ?? nowIso,
+      firstLevelCompletedAt: save.engagement?.firstLevelCompletedAt ?? firstResultAt,
+      firstLevelFailedAt: save.engagement?.firstLevelFailedAt ?? (firstResultAt ? null : nowIso),
+      storeIntroSeen: save.engagement?.storeIntroSeen ?? true,
+    };
+
+    window.localStorage.setItem("bubble-kingdom:save", JSON.stringify(save));
+  }, input);
+}
+
+async function openDailyRewardsScreen(page: Page) {
+  if ((await page.locator(".daily-rewards-screen").count()) === 0) {
+    await page.click('[data-action="open-screen"][data-id="dailyRewards"]');
+  }
+  await expect(page.locator(".daily-rewards-screen")).toBeVisible();
+}
 
 async function dismissDailyReward(page: Page) {
   const claimButton = page.locator('[data-action="claim-daily"]');

@@ -163,6 +163,12 @@ select {
   padding-bottom: 90px;
 }
 
+.main-layout.is-simple-menu {
+  grid-template-columns: minmax(0, 720px);
+  justify-content: center;
+  padding-bottom: 24px;
+}
+
 .panel {
   padding: 18px;
   overflow: auto;
@@ -181,6 +187,7 @@ select {
 .goal-card,
 .settings-grid,
 .offer-grid,
+.theme-grid,
 .prelevel-summary-grid,
 .prelevel-booster-grid,
 .restoration-grid,
@@ -394,7 +401,7 @@ select {
   right: var(--safe-right);
   bottom: var(--safe-bottom);
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
   gap: 8px;
   padding: 10px;
 }
@@ -576,6 +583,95 @@ select {
 .shop-status-card.is-complete {
   border-color: rgba(82, 152, 116, 0.34);
   box-shadow: 0 18px 44px rgba(82, 152, 116, 0.14);
+}
+
+.theme-shop-section {
+  display: grid;
+  gap: 12px;
+  margin: 12px 0 14px;
+}
+
+.theme-grid {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.theme-card {
+  display: grid;
+  gap: 10px;
+  position: relative;
+  overflow: hidden;
+  min-height: 260px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(23, 48, 66, 0.1);
+  border-radius: 18px;
+  padding: 14px;
+}
+
+.theme-card.is-active {
+  border-color: rgba(76, 191, 176, 0.32);
+  box-shadow: 0 18px 40px rgba(76, 191, 176, 0.14);
+}
+
+.theme-card.is-locked {
+  opacity: 0.72;
+}
+
+.theme-preview {
+  min-height: 88px;
+  border-radius: 16px;
+  border: 1px solid rgba(23, 48, 66, 0.08);
+}
+
+.theme-preview-blossom {
+  background: linear-gradient(135deg, #ffcfdf, #f9f0b6 55%, #8bd8b0);
+}
+
+.theme-preview-crystal {
+  background: linear-gradient(135deg, #b7f3ff, #f5fbff 48%, #56c2d6);
+}
+
+.theme-preview-gates {
+  background: linear-gradient(135deg, #705b52, #d8bd84 52%, #b44760);
+}
+
+.theme-preview-spring {
+  background: linear-gradient(135deg, #fbd164, #ff9aa7 48%, #62c98d);
+}
+
+.theme-preview-moonlit {
+  background: linear-gradient(135deg, #20314f, #6f7bc8 48%, #e5d7ff);
+}
+
+#app[data-theme="theme_crystal_fountain"] {
+  --bg-top: #10364b;
+  --bg-mid: #27748a;
+  --bg-bottom: #cdeef2;
+  --accent: #30aeca;
+  --accent-2: #76d6c9;
+}
+
+#app[data-theme="theme_castle_gates"] {
+  --bg-top: #2b2732;
+  --bg-mid: #694f55;
+  --bg-bottom: #d8bd84;
+  --accent: #b44760;
+  --accent-2: #d7a857;
+}
+
+#app[data-theme="theme_spring_blossom"] {
+  --bg-top: #294839;
+  --bg-mid: #5aa776;
+  --bg-bottom: #fbd164;
+  --accent: #ff7c8c;
+  --accent-2: #55c981;
+}
+
+#app[data-theme="theme_moonlit_courtyard"] {
+  --bg-top: #10182c;
+  --bg-mid: #33487b;
+  --bg-bottom: #cfc5ff;
+  --accent: #8f79ff;
+  --accent-2: #56c0d6;
 }
 
 .offer-benefit-grid {

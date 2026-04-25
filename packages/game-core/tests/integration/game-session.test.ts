@@ -143,13 +143,15 @@ describe("game session integration", () => {
     difficulty: "easy",
   };
 
-  it("boots first-time users into the daily reward flow", async () => {
+  it("boots first-time users into the simple map flow", async () => {
     const session = createSession();
     await session.boot();
 
     expect(session.getState().bootStatus).toBe("ready");
-    expect(session.getState().currentScreen).toBe("dailyRewards");
+    expect(session.getState().currentScreen).toBe("map");
     expect(session.getState().dailyRewardAvailable).toBe(true);
+    expect(session.getState().menuState).toBe("menu_state_0");
+    expect(session.getState().storeState).toBe("store_state_0");
   });
 
   it("claims daily reward and persists it across sessions", async () => {
@@ -212,6 +214,10 @@ describe("game session integration", () => {
     });
     progressedSave.progression.lastDailyRewardAt = nowIso;
     progressedSave.progression.dailyRewardDay = 1;
+    progressedSave.progression.completedLevels = [1, 2, 3];
+    progressedSave.progression.currentLevelId = 4;
+    progressedSave.engagement.hasStartedLevel = true;
+    progressedSave.engagement.firstLevelCompletedAt = nowIso;
     progressedSave.quests.daily_complete_3 = {
       progress: 3,
       claimed: false,
@@ -1031,6 +1037,136 @@ describe("game session integration", () => {
     expect(session.getState().rewardReveal?.titleKey).toBe(milestone.titleKey);
   });
 
+  it("keeps the next claimable event reward highlighted inside the event screen after dismissing the reveal", async () => {
+    const event = liveEvents[0]!;
+    const firstMilestone = event.rewardTrack[0]!;
+    const secondMilestone = event.rewardTrack[1]!;
+    const nowIso = "2026-04-08T00:00:00.000Z";
+    const progressedSave = createDefaultSave({
+      anonymousId: "anon-event-follow-up-screen",
+      language: "en",
+      nowIso,
+      remoteConfig: defaultRemoteConfig,
+    });
+    progressedSave.currencies.seasonalTokens = secondMilestone.tokenCost;
+    progressedSave.currencies.gold = 0;
+    progressedSave.currencies.petals = 0;
+    progressedSave.progression.completedLevels = [1, 2];
+    progressedSave.progression.currentLevelId = 3;
+    progressedSave.progression.lastDailyRewardAt = nowIso;
+    progressedSave.progression.dailyRewardDay = 1;
+    progressedSave.tutorial.completed = true;
+    window.localStorage.setItem("bubble-kingdom-test:save", JSON.stringify(progressedSave));
+
+    const session = createSession();
+    await session.boot();
+    await session.openScreen("event");
+
+    await session.claimEventReward(firstMilestone.id);
+
+    expect(session.getState().rewardReveal?.titleKey).toBe(firstMilestone.titleKey);
+    expect(session.getState().rewardReveal?.primaryAction).toEqual({
+      action: "claim-event-reward",
+      id: secondMilestone.id,
+      labelKey: "event.claim",
+    });
+
+    await session.dismissRewardReveal();
+
+    expect(session.getState().currentScreen).toBe("event");
+    expect(session.getState().mapSpotlight).toBeNull();
+    expect(session.getState().screenSpotlight).toEqual({
+      screenId: "event",
+      tagKey: "screen.event",
+      titleKey: secondMilestone.titleKey,
+      bodyKey: "event.rewardReady",
+      action: {
+        action: "claim-event-reward",
+        id: secondMilestone.id,
+        labelKey: "event.claim",
+      },
+    });
+
+    await session.openScreen("map");
+
+    expect(session.getState().screenSpotlight).toBeNull();
+    expect(session.getState().mapSpotlight).toEqual({
+      tagKey: "screen.event",
+      titleKey: secondMilestone.titleKey,
+      bodyKey: "event.rewardReady",
+      action: {
+        action: "claim-event-reward",
+        id: secondMilestone.id,
+        labelKey: "event.claim",
+      },
+    });
+  });
+
+  it("turns an event claim into a play-next-level follow-up when no other milestone is claimable", async () => {
+    const event = liveEvents[0]!;
+    const firstMilestone = event.rewardTrack[0]!;
+    const nowIso = "2026-04-08T00:00:00.000Z";
+    const progressedSave = createDefaultSave({
+      anonymousId: "anon-event-follow-up-play",
+      language: "en",
+      nowIso,
+      remoteConfig: defaultRemoteConfig,
+    });
+    progressedSave.currencies.seasonalTokens = firstMilestone.tokenCost;
+    progressedSave.currencies.gold = 0;
+    progressedSave.currencies.petals = 0;
+    progressedSave.progression.completedLevels = [1, 2];
+    progressedSave.progression.currentLevelId = 3;
+    progressedSave.progression.lastDailyRewardAt = nowIso;
+    progressedSave.progression.dailyRewardDay = 1;
+    progressedSave.tutorial.completed = true;
+    window.localStorage.setItem("bubble-kingdom-test:save", JSON.stringify(progressedSave));
+
+    const session = createSession();
+    await session.boot();
+    await session.openScreen("event");
+
+    await session.claimEventReward(firstMilestone.id);
+
+    expect(session.getState().rewardReveal?.titleKey).toBe(firstMilestone.titleKey);
+    expect(session.getState().rewardReveal?.featureHighlight).toEqual({
+      tagKey: "screen.event",
+      titleKey: "event.followup.playTitle",
+      bodyKey: "event.followup.playBody",
+    });
+    expect(session.getState().rewardReveal?.primaryAction).toEqual({
+      action: "start-current-level",
+      labelKey: "reward.reveal.keepPlaying",
+    });
+
+    await session.dismissRewardReveal();
+
+    expect(session.getState().currentScreen).toBe("event");
+    expect(session.getState().screenSpotlight).toEqual({
+      screenId: "event",
+      tagKey: "screen.event",
+      titleKey: "event.followup.playTitle",
+      bodyKey: "event.followup.playBody",
+      action: {
+        action: "start-current-level",
+        labelKey: "reward.reveal.keepPlaying",
+      },
+    });
+
+    await session.openScreen("map");
+
+    expect(session.getState().screenSpotlight).toBeNull();
+    expect(session.getState().mapSpotlight).toEqual({
+      tagKey: "screen.event",
+      titleKey: "event.followup.playTitle",
+      bodyKey: "event.followup.playBody",
+      action: {
+        action: "start-current-level",
+        labelKey: "reward.reveal.keepPlaying",
+      },
+    });
+  });
+
   it("keeps interstitials active after ad light while suppressing sticky banners", async () => {
     const storagePrefix = "bubble-kingdom-test-ad-light";
     const { platform, logger, stats } = createInstrumentedPlatform(storagePrefix);
@@ -1394,6 +1530,7 @@ describe("game session integration", () => {
   it("shows a restoration reveal after rebuilding a kingdom object", async () => {
     const chapter = chapters[0]!;
     const node = chapter.restorationNodes[0]!;
+    const nextNode = chapter.restorationNodes[1]!;
     const progressedSave = createDefaultSave({
       anonymousId: "anon-restoration-reveal",
       language: "en",
@@ -1419,10 +1556,40 @@ describe("game session integration", () => {
       id: "restoration",
       labelKey: "reward.reveal.viewNextRestore",
     });
+    expect(session.getState().rewardReveal?.featureHighlight).toEqual({
+      tagKey: "reward.reveal.renovationReadyTag",
+      titleKey: nextNode.titleKey,
+      bodyKey: "reward.reveal.renovationReadyBody",
+    });
 
     await session.dismissRewardReveal();
 
     expect(session.getState().rewardReveal).toBeNull();
+    expect(session.getState().mapSpotlight).toEqual({
+      tagKey: "reward.reveal.renovationReadyTag",
+      titleKey: nextNode.titleKey,
+      bodyKey: "reward.reveal.renovationReadyBody",
+      action: {
+        action: "open-screen",
+        id: "restoration",
+        labelKey: "reward.reveal.viewNextRestore",
+      },
+    });
+
+    await session.openScreen("restoration");
+
+    expect(session.getState().mapSpotlight).toBeNull();
+    expect(session.getState().screenSpotlight).toEqual({
+      screenId: "restoration",
+      tagKey: "reward.reveal.renovationReadyTag",
+      titleKey: nextNode.titleKey,
+      bodyKey: "reward.reveal.renovationReadyBody",
+      action: {
+        action: "open-screen",
+        id: "restoration",
+        labelKey: "reward.reveal.viewNextRestore",
+      },
+    });
   });
 
   it("keeps an event follow-up spotlight on the map after dismissing a chapter chest reveal", async () => {
@@ -1478,15 +1645,27 @@ describe("game session integration", () => {
     expect(session.getState().save.events[event.id]?.claimedMilestones).toContain(milestone.id);
     expect(session.getState().save.currencies.gold).toBeGreaterThan(goldBefore);
     expect(session.getState().rewardReveal?.titleKey).toBe(milestone.titleKey);
-    expect(session.getState().rewardReveal?.featureHighlight?.titleKey).toBe(chapters[0]!.titleKey);
+    expect(session.getState().rewardReveal?.featureHighlight).toEqual({
+      tagKey: "screen.event",
+      titleKey: "event.followup.playTitle",
+      bodyKey: "event.followup.playBody",
+    });
     expect(session.getState().rewardReveal?.primaryAction).toEqual({
       action: "start-current-level",
-      labelKey: "map.play",
+      labelKey: "reward.reveal.keepPlaying",
     });
 
     await session.dismissRewardReveal();
 
     expect(session.getState().rewardReveal).toBeNull();
-    expect(session.getState().mapSpotlight?.titleKey).toBe(chapters[0]!.titleKey);
+    expect(session.getState().mapSpotlight).toEqual({
+      tagKey: "screen.event",
+      titleKey: "event.followup.playTitle",
+      bodyKey: "event.followup.playBody",
+      action: {
+        action: "start-current-level",
+        labelKey: "reward.reveal.keepPlaying",
+      },
+    });
   });
 });

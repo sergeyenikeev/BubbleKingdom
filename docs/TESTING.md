@@ -74,6 +74,9 @@ Current integration suite validates:
 - chapter-unlock reveal presentation on map boot for newly opened zones
 - map spotlight persistence after dismissing reveal modals, plus spotlight consumption and self-healing when the player returns to map without active guidance
 - restoration reveal presentation, CTA wiring, and dismissal
+- restoration reveal continuity into `dismiss reveal -> map spotlight -> restoration screen spotlight` for real rebuilds
+- event reward reveal continuity into `claim first milestone -> dismiss reveal -> next milestone screen spotlight -> back to map spotlight`
+- event reward fallback routing into `claim milestone -> dismiss reveal -> Play next level` when no additional milestone is claimable
 - deterministic `Ad Light` vs `No Ads` ad-suppression behavior under forced interstitial-pacing variants
 - corrupted save recovery
 
@@ -113,12 +116,15 @@ Playwright smoke covers:
 - Playwright smoke now boots on its own dedicated preview port with server reuse disabled, preventing false negatives from unrelated local preview servers on the same machine
 - `Season Pass` smoke now also asserts the in-event fallback `Play next level` CTA for non-claimable progress, proving the event overlay can hand the player back into gameplay instead of ending on a passive explainer
 - `restoration` smoke now also asserts the unaffordable-upgrade fallback `Play next level` CTA, proving shortage states route back into gameplay instead of trapping the player in a passive upgrade overlay
+- `restoration` smoke now also asserts `restore -> View next restore -> screen spotlight + companion CTA`, proving real rebuild reveals carry their next-landmark context into the destination overlay instead of dropping to a generic panel
 - pre-level modal appears before gameplay and confirms into the level
 - game canvas and HUD render together
 - shop purchase persists to save storage
 - settings-driven RU/EN switch updates visible UI copy
 - map-shell event summary is visible before the full event modal opens
 - full event reward track renders inside the event modal
+- event milestone smoke now asserts a single highlighted companion card both before and after claim, while the next claimable reward survives dismiss as an in-event spotlight
+- event smoke also covers the no-next-claimable case, proving the overlay pivots into a `Play next level` earning route instead of a passive event panel
 - restoration reveal routes the player into the next restoration target flow
 - chapter-chest reveal routes the player into the featured event flow
 - chapter-unlock reveal routes the player into the new chapter's level-briefing flow

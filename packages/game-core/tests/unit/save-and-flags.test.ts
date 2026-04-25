@@ -48,10 +48,12 @@ describe("save migrations and feature flags", () => {
       inbox: [],
     });
 
-    expect(migrated.schemaVersion).toBe(4);
+    expect(migrated.schemaVersion).toBe(5);
     expect(migrated.economy.noAdsPurchased).toBe(false);
     expect(migrated.tutorial.currentStep).toBe("aim");
     expect(migrated.events).toEqual({});
+    expect(migrated.engagement.hasStartedLevel).toBe(false);
+    expect(migrated.cosmetics.activeThemeId).toBe("theme_blossom_gardens");
   });
 
   it("assigns experiment variants deterministically", () => {

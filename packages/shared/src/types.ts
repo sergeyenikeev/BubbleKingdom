@@ -190,6 +190,32 @@ export interface ShopOfferDefinition {
   yandexProductId?: string;
 }
 
+export interface VisualThemeDefinition {
+  id: string;
+  titleKey: string;
+  descriptionKey: string;
+  previewClass: string;
+  price: {
+    gems: number;
+  };
+  unlock:
+    | {
+        type: "always";
+      }
+    | {
+        type: "completed_levels";
+        count: number;
+      }
+    | {
+        type: "current_level";
+        levelId: number;
+      }
+    | {
+        type: "seasonal_tokens";
+        amount: number;
+      };
+}
+
 export interface ReceiptValidationRequest {
   offerId: string;
   productId: string;

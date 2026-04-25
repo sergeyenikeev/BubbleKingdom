@@ -5,6 +5,7 @@ import { questDefinitions } from "./content/quests";
 import { validateChapters, validateEvents, validateLevelData } from "./content/validation";
 import { levels } from "./levels/generated";
 import { shopCatalog } from "./shop/catalog";
+import { visualThemes } from "./shop/themes";
 
 export * from "./content/chapters";
 export * from "./content/dailyRewards";
@@ -16,6 +17,7 @@ export * from "./levels/generated";
 export * from "./levels/helpers";
 export * from "./shop/catalog";
 export * from "./shop/commerce";
+export * from "./shop/themes";
 
 export const contentVersion = "2026.04.09-mvp.2";
 
@@ -36,4 +38,5 @@ export const liveContent = {
   quests: questDefinitions,
   levels,
   shopCatalog,
+  visualThemes,
 };

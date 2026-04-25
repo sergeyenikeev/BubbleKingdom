@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { LanguageCode } from "@bubble-kingdom/shared";
 import type { RemoteConfig } from "@bubble-kingdom/config";
 
-export const SAVE_SCHEMA_VERSION = 4;
+export const SAVE_SCHEMA_VERSION = 5;
 
 export const playerSaveSchema = z.object({
   schemaVersion: z.number(),
@@ -89,6 +89,18 @@ export const playerSaveSchema = z.object({
     firstPurchaseAt: z.string().nullable(),
     rewardedViews: z.number(),
   }),
+  engagement: z.object({
+    sessionCount: z.number(),
+    hasStartedLevel: z.boolean(),
+    firstLevelStartedAt: z.string().nullable(),
+    firstLevelCompletedAt: z.string().nullable(),
+    firstLevelFailedAt: z.string().nullable(),
+    storeIntroSeen: z.boolean(),
+  }),
+  cosmetics: z.object({
+    activeThemeId: z.string(),
+    unlockedThemeIds: z.array(z.string()),
+  }),
   experiments: z.record(z.string(), z.string()),
   tutorial: z.object({
     completed: z.boolean(),
@@ -153,6 +165,18 @@ export function createDefaultSave(input: {
       piggyBankGold: 0,
       firstPurchaseAt: null,
       rewardedViews: 0,
+    },
+    engagement: {
+      sessionCount: 0,
+      hasStartedLevel: false,
+      firstLevelStartedAt: null,
+      firstLevelCompletedAt: null,
+      firstLevelFailedAt: null,
+      storeIntroSeen: false,
+    },
+    cosmetics: {
+      activeThemeId: "theme_blossom_gardens",
+      unlockedThemeIds: ["theme_blossom_gardens"],
     },
     experiments: {},
     tutorial: {
